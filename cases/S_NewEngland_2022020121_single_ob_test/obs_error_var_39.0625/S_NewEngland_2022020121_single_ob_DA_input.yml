@@ -1,0 +1,106 @@
+# Input Parameters for Cloud DA Case Analysis
+#--------------------------------------------
+
+# UPP output for each ensemble member
+str_format: '/mnt/lfs5/BMC/wrfruc/murdzek/RRFS_Ens_Cloud_DA/Feb2022_retro/Ens_GDAS_SDLVDL_noGF_cloud1/v0.6.2/prod/rrfs_conus_3km_ensda.20220201/20/mem{num:04d}/rrfs.t20z.{lev}.f001.conus_3km.grib2'
+prslev_vars:
+  - 'HGT_P0_L215_GLC0'
+  - 'CEIL_P0_L215_GLC0'
+  - 'CEIL_P0_L2_GLC0'
+nmem: 30
+
+# BUFR parameters
+bufr_fname: '/lfs5/BMC/wrfruc/murdzek/real_obs/decoded_bufr_for_cloudDA/202202012100.rap.prepbufr.csv'
+
+# Subset domain
+min_lon: -73.0
+max_lon: -70.5
+min_lat: 41.25
+max_lat: 43.0
+z_ind:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 11
+  - 12
+  - 13
+  - 14
+  - 15
+  - 16
+  - 17
+  - 18
+  - 19
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+  - 26
+  - 27
+  - 28
+  - 29
+  - 30
+  - 31
+  - 32
+  - 33
+  - 34
+  - 35
+
+# Variables to include in state matrix (assumed to be 3D)
+state_vars:
+  - 'TMP_P0_L105_GLC0'
+  - 'SPFH_P0_L105_GLC0'
+  - 'TCDC_P0_L105_GLC0'
+
+# Tag to add to output files and output file directory
+save_tag: 'S_NewEngland_2022020121_single_ob_test'
+out_dir: '/lfs5/BMC/wrfruc/murdzek/src/py_scripts/cloud_da/cases/S_NewEngland_2022020121_single_ob_test/obs_error_var_39.0625' 
+
+# Misc options
+do_bec: False
+
+# Options for single observation test
+ob_sid:
+  - 'KPVD' 
+  - 'KEWB'
+  - 'KHFD'
+  - 'KBOS'
+  - 'KBOS'
+  - 'KBDL'
+ob_idx: 
+  - 1
+  - 1
+  - 2
+  - 1
+  - 2
+  - 3
+ob_var: 39.0625
+plot_postage_stamp: True
+plot_ens_stats: True
+plot_nrows: 4
+plot_ncols: 4
+plot_klvls:
+  - 2
+  - 4
+  - 6
+  - 8
+  - 10
+  - 12
+  - 14
+  - 16
+  - 17
+  - 18
+  - 19
+  - 20
+  - 22
+  - 24
+  - 26
+  - 28

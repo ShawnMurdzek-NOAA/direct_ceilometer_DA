@@ -1,0 +1,34 @@
+
+# Ignore slurm output files
+slurm*.out
+
+# Ignore swp files
+*.swp
+
+# Ignore images files
+*.png
+*.pdf
+
+# Ignore core dumps
+core*
+
+# Ignore .npy files
+*.npy
+
+# Ignore log files
+*.log
+
+# Ignore database files from Rocoto
+*.db
+
+# Pycache
+modules/
+
+# Ignore pickle files
+*.pkl
+
+# Jupyter notebook logs
+.ipynb_checkpoints/
+
+# Output text files
+*.txt
