@@ -33,8 +33,8 @@ import pyDA_utils.plot_model_data as pmd
 import pyDA_utils.bufr as bufr
 import pyDA_utils.ensemble_utils as eu
 import pyDA_utils.upp_postprocess as uppp
-import pyDA_utils.cloud_DA_forward_operator as cfo
-import pyDA_utils.cloud_DA_forward_operator_viz as cfov
+import direct_ceilometer_DA.main.cloud_DA_forward_operator as cfo
+import direct_ceilometer_DA.main.cloud_DA_forward_operator_viz as cfov
 
 
 #---------------------------------------------------------------------------------------------------
