@@ -9,6 +9,10 @@ prslev_vars:
   - 'CEIL_P0_L2_GLC0'
 nmem: 30
 
+# Option to save output to a netCDF file
+subset_ens_nc: '/lfs5/BMC/wrfruc/murdzek/src/py_scripts/cloud_da/cases/S_NewEngland_2022020121_single_ob_test/default_test/S_NewEngland_subset_ens.nc'
+save_to_nc: True
+
 # BUFR parameters
 bufr_fname: '/lfs5/BMC/wrfruc/murdzek/real_obs/decoded_bufr_for_cloudDA/202202012100.rap.prepbufr.csv'
 

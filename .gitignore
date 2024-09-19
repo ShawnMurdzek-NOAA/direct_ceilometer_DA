@@ -9,6 +9,7 @@ slurm*.out
 *.png
 *.pdf
 !tests/data/*/*.png
+!tests/data/*.png
 
 # Ignore core dumps
 core*

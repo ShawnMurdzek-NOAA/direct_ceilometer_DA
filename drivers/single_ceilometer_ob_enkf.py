@@ -25,6 +25,8 @@ import probing_rrfs_ensemble as pre
 import direct_ceilometer_DA.main.cloud_DA_forward_operator as cfo
 from pyDA_utils import enkf
 import pyDA_utils.plot_model_data as pmd
+import pyDA_utils.ensemble_utils as eu
+from pyDA_utils import bufr
 
 
 #---------------------------------------------------------------------------------------------------
@@ -52,6 +54,20 @@ def ens_avg_z_1d(ens_obj):
                   ens_obj.subset_ds[mem_name]['HGT_P0_L1_GLC0'].values[np.newaxis, :, :], axis=(1, 2))
 
     return z1d
+
+
+def read_ens_from_nc(param):
+    """
+    Read in an ensemble subset from a netCDF file
+    """
+
+    ens_obj = eu.read_subset_ens_nc(param['subset_ens_nc'])
+    ens_obj.verif_obs = bufr.bufrCSV(param['bufr_fname'])
+    ens_obj.state_matrix = ens_obj._create_state_matrix(param['state_vars'])
+    ens_obj.state_matrix.update(ens_obj._compute_ens_stats())
+    ens_obj.state_matrix['ens_dev'] = ens_obj._compute_ens_deviations()
+
+    return ens_obj
 
 
 def read_preprocess_ens(yml_fname):
@@ -82,7 +98,13 @@ def read_preprocess_ens(yml_fname):
     # Read input data
     with open(yml_fname, 'r') as fptr:
         param = yaml.safe_load(fptr)
-    ens_obj = pre.read_ensemble_output(param)
+    try:
+        ens_obj = read_ens_from_nc(param)
+        print('using subset ensemble output from netCDF file')
+    except:
+        ens_obj = pre.read_ensemble_output(param)
+        if param['save_to_nc']:
+            ens_obj.save_subset_ens(param['subset_ens_nc'])
 
     # Create 1D array of average heights AGL
     z1d = ens_avg_z_1d(ens_obj)
