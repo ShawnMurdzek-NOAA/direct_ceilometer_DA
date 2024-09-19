@@ -5,9 +5,10 @@ slurm*.out
 # Ignore swp files
 *.swp
 
-# Ignore images files
+# Ignore images files (except in test directory)
 *.png
 *.pdf
+!tests/data/*/*.png
 
 # Ignore core dumps
 core*
