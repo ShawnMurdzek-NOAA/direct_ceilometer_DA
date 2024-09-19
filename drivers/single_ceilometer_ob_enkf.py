@@ -720,55 +720,54 @@ if __name__ == '__main__':
         # Plot ensemble mean and standard deviation
         save_dir = f"{param['out_dir']}/{ob_sid}_{ob_idx}"
         os.system(f"mkdir {save_dir}")
-        if param['plot_ens_stats']:
-            print('Making ensemble mean and standard deviation plots')
-            for meta, cmap in zip(['mean_', 'mean_ana_', 'mean_incr_', 'std_', 'std_ana_', 'K_'], 
-                                ['plasma', 'plasma', 'bwr', 'plasma', 'plasma', 'bwr']):
-                for v in param['state_vars']:
-                    field = meta + v
-                    if field not in ens_obj.subset_ds[ens_obj.mem_names[0]]:
-                        print(f'field {field} is missing. Skipping.')
-                        continue
-                    print(f'plotting {field}...')
-                    maxval = np.percentile(np.abs(ens_obj.subset_ds[ens_obj.mem_names[0]][field]), 99)
-                    minval = np.percentile(np.abs(ens_obj.subset_ds[ens_obj.mem_names[0]][field]), 1)
-                    if cmap == 'bwr':
-                        clevels = np.linspace(-1, 1, 30) * maxval
-                    else:
-                        clevels = np.linspace(minval, maxval, 30)
-                    if (maxval == 0) and (minval == 0):
-                        clevels = np.linspace(-1, 1, 30)
-                    fig = plot_horiz_slices(ens_obj.subset_ds[ens_obj.mem_names[0]], 
-                                            field,
-                                            ens_obj,
-                                            param,
-                                            nrows=param['plot_nrows'],
-                                            ncols=param['plot_ncols'],
-                                            klvls=param['plot_klvls'], 
-                                            cntf_kw={'cmap':cmap, 'levels':clevels, 'extend':'both'},
-                                            ob={'plot':True,
-                                                'x':cld_ob_df['XOB'].values[0] - 360, 
-                                                'y':cld_ob_df['YOB'].values[0], 
-                                                'kwargs':{'marker':'*', 'color':'k'}},
-                                            save_dir=save_dir)
-                    plt.close(fig)
+        print('Making ensemble statistic plots')
+        for field in param['ens_stats_plots']:
+            if field not in ens_obj.subset_ds[ens_obj.mem_names[0]]:
+                print(f'field {field} is missing. Skipping.')
+                continue
+            print(f'plotting {field}...')
+            maxval = np.percentile(np.abs(ens_obj.subset_ds[ens_obj.mem_names[0]][field]), 99)
+            minval = np.percentile(np.abs(ens_obj.subset_ds[ens_obj.mem_names[0]][field]), 1)
+            if field.split('_')[1] == 'incr':
+                cmap = 'bwr'
+                clevels = np.linspace(-1, 1, 30) * maxval
+            else:
+                cmap = 'plasma'
+                clevels = np.linspace(minval, maxval, 30)
+            if (maxval == 0) and (minval == 0):
+                clevels = np.linspace(-1, 1, 30)
+            fig = plot_horiz_slices(ens_obj.subset_ds[ens_obj.mem_names[0]], 
+                                    field,
+                                    ens_obj,
+                                    param,
+                                    nrows=param['plot_nrows'],
+                                    ncols=param['plot_ncols'],
+                                    klvls=param['plot_klvls'], 
+                                    cntf_kw={'cmap':cmap, 'levels':clevels, 'extend':'both'},
+                                    ob={'plot':True,
+                                        'x':cld_ob_df['XOB'].values[0] - 360, 
+                                        'y':cld_ob_df['YOB'].values[0], 
+                                        'kwargs':{'marker':'*', 'color':'k'}},
+                                    save_dir=save_dir)
+            plt.close(fig)
 
         # Make postage stamp plots
-        if param['plot_postage_stamp']:
-            print('Making postage stamp plots')
-            klvl = np.argmin(np.abs(ens_z1d - cld_z))
-            print(f"postage stamp klvl = {klvl} ({ens_z1d[klvl]} m AGL)")
-            for meta in ['', 'incr_', 'ana_']:
-                for v in param['state_vars']:
-                    print(f'plotting {meta}{v}...')
-                    fig = plot_horiz_postage_stamp(ens_obj, param, upp_field=f'{meta}{v}', 
-                                                klvl=klvl,
-                                                ob={'plot':True,
-                                                    'x':cld_ob_df['XOB'].values[0] - 360, 
-                                                    'y':cld_ob_df['YOB'].values[0], 
-                                                    'kwargs':{'marker':'*', 'color':'k'}},
-                                                save_dir=save_dir)
-                    plt.close(fig)
+        print('Making postage stamp plots')
+        klvl = np.argmin(np.abs(ens_z1d - cld_z))
+        print(f"postage stamp klvl = {klvl} ({ens_z1d[klvl]} m AGL)")
+        for field in param['postage_stamp_plots']:
+            if field not in ens_obj.subset_ds[ens_obj.mem_names[0]]:
+                print(f'field {field} is missing. Skipping.')
+                continue
+            print(f'plotting {field}...')
+            fig = plot_horiz_postage_stamp(ens_obj, param, upp_field=field, 
+                                           klvl=klvl,
+                                           ob={'plot':True,
+                                               'x':cld_ob_df['XOB'].values[0] - 360, 
+                                               'y':cld_ob_df['YOB'].values[0], 
+                                               'kwargs':{'marker':'*', 'color':'k'}},
+                                           save_dir=save_dir)
+            plt.close(fig)
         
         # Clean up
         print(f'total time for {ob_sid} {ob_idx} (forward operator, EnSRF, and plots) = {(dt.datetime.now() - start_loop).total_seconds()} s')

@@ -10,7 +10,7 @@ prslev_vars:
 nmem: 3
 
 # Option to save output to a netCDF file
-subset_ens_nc: '/mnt/lfs5/BMC/wrfruc/murdzek/src/direct_ceilometer_DA/tests/data/test_data2.nc'
+subset_ens_nc: '/mnt/lfs5/BMC/wrfruc/murdzek/src/direct_ceilometer_DA/tests/data/test_data.nc'
 save_to_nc: True
 
 # BUFR parameters
@@ -77,8 +77,28 @@ ob_sid:
 ob_idx: 
   - 2
 ob_var: 156.25
-plot_postage_stamp: True
-plot_ens_stats: False
+
+# Plotting options
+postage_stamp_plots:
+  - 'TMP_P0_L105_GLC0'
+  - 'SPFH_P0_L105_GLC0'
+  - 'TCDC_P0_L105_GLC0'
+  - 'RH_P0_L105_GLC0'
+  - 'incr_RH_P0_L105_GLC0'
+  - 'ana_RH_P0_L105_GLC0'
+ens_stats_plots:
+#  - 'mean_TMP_P0_L105_GLC0'
+#  - 'mean_SPFH_P0_L105_GLC0'
+#  - 'mean_TCDC_P0_L105_GLC0'
+  - 'mean_RH_P0_L105_GLC0'
+#  - 'mean_incr_TMP_P0_L105_GLC0'
+#  - 'mean_incr_SPFH_P0_L105_GLC0'
+#  - 'mean_incr_TCDC_P0_L105_GLC0'
+  - 'mean_incr_RH_P0_L105_GLC0'
+#  - 'mean_ana_TMP_P0_L105_GLC0'
+#  - 'mean_ana_SPFH_P0_L105_GLC0'
+#  - 'mean_ana_TCDC_P0_L105_GLC0'
+  - 'mean_ana_RH_P0_L105_GLC0'
 plot_nrows: 4
 plot_ncols: 4
 plot_klvls:

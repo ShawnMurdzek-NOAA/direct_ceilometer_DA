@@ -9,6 +9,10 @@ prslev_vars:
   - 'CEIL_P0_L2_GLC0'
 nmem: 30
 
+# Option to save output to a netCDF file
+subset_ens_nc: '/lfs5/BMC/wrfruc/murdzek/src/py_scripts/cloud_da/cases/S_NewEngland_2022020121_single_ob_test/default_test/S_NewEngland_subset_ens.nc'
+save_to_nc: True
+
 # BUFR parameters
 bufr_fname: '/lfs5/BMC/wrfruc/murdzek/real_obs/decoded_bufr_for_cloudDA/202202012100.rap.prepbufr.csv'
 
@@ -62,7 +66,7 @@ state_vars:
 
 # Tag to add to output files and output file directory
 save_tag: 'S_NewEngland_2022020121_single_ob_test'
-out_dir: '/lfs5/BMC/wrfruc/murdzek/src/py_scripts/cloud_da/cases/S_NewEngland_2022020121_single_ob_test/obs_error_var_39.0625' 
+out_dir: '/lfs5/BMC/wrfruc/murdzek/src/py_scripts/cloud_da/cases/S_NewEngland_2022020121_single_ob_test/default_test' 
 
 # Misc options
 do_bec: False
@@ -83,8 +87,28 @@ ob_idx:
   - 2
   - 3
 ob_var: 39.0625
-plot_postage_stamp: True
-plot_ens_stats: True
+
+# Plotting options
+postage_stamp_plots:
+  - 'TMP_P0_L105_GLC0'
+  - 'SPFH_P0_L105_GLC0'
+  - 'TCDC_P0_L105_GLC0'
+  - 'RH_P0_L105_GLC0'
+  - 'incr_RH_P0_L105_GLC0'
+  - 'ana_RH_P0_L105_GLC0'
+ens_stats_plots:
+#  - 'mean_TMP_P0_L105_GLC0'
+#  - 'mean_SPFH_P0_L105_GLC0'
+#  - 'mean_TCDC_P0_L105_GLC0'
+  - 'mean_RH_P0_L105_GLC0'
+#  - 'mean_incr_TMP_P0_L105_GLC0'
+#  - 'mean_incr_SPFH_P0_L105_GLC0'
+#  - 'mean_incr_TCDC_P0_L105_GLC0'
+  - 'mean_incr_RH_P0_L105_GLC0'
+#  - 'mean_ana_TMP_P0_L105_GLC0'
+#  - 'mean_ana_SPFH_P0_L105_GLC0'
+#  - 'mean_ana_TCDC_P0_L105_GLC0'
+  - 'mean_ana_RH_P0_L105_GLC0'
 plot_nrows: 4
 plot_ncols: 4
 plot_klvls:

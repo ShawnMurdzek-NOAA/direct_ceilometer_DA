@@ -87,8 +87,28 @@ ob_idx:
   - 2
   - 3
 ob_var: 156.25
-plot_postage_stamp: True
-plot_ens_stats: True
+
+# Plotting options
+postage_stamp_plots:
+  - 'TMP_P0_L105_GLC0'
+  - 'SPFH_P0_L105_GLC0'
+  - 'TCDC_P0_L105_GLC0'
+  - 'RH_P0_L105_GLC0'
+  - 'incr_RH_P0_L105_GLC0'
+  - 'ana_RH_P0_L105_GLC0'
+ens_stats_plots:
+#  - 'mean_TMP_P0_L105_GLC0'
+#  - 'mean_SPFH_P0_L105_GLC0'
+#  - 'mean_TCDC_P0_L105_GLC0'
+  - 'mean_RH_P0_L105_GLC0'
+#  - 'mean_incr_TMP_P0_L105_GLC0'
+#  - 'mean_incr_SPFH_P0_L105_GLC0'
+#  - 'mean_incr_TCDC_P0_L105_GLC0'
+  - 'mean_incr_RH_P0_L105_GLC0'
+#  - 'mean_ana_TMP_P0_L105_GLC0'
+#  - 'mean_ana_SPFH_P0_L105_GLC0'
+#  - 'mean_ana_TCDC_P0_L105_GLC0'
+  - 'mean_ana_RH_P0_L105_GLC0'
 plot_nrows: 4
 plot_ncols: 4
 plot_klvls:
