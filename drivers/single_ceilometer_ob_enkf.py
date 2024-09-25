@@ -27,6 +27,7 @@ from pyDA_utils import enkf
 import pyDA_utils.plot_model_data as pmd
 import pyDA_utils.ensemble_utils as eu
 from pyDA_utils import bufr
+import pyDA_utils.colormaps as cm
 
 
 #---------------------------------------------------------------------------------------------------
@@ -105,6 +106,23 @@ def read_preprocess_ens(yml_fname):
         ens_obj = pre.read_ensemble_output(param)
         if param['save_to_nc']:
             ens_obj.save_subset_ens(param['subset_ens_nc'])
+
+    # Reformat plotting options
+    cmap_dict = cm.generate_cust_cmaps_dict()
+    #for key in ['postage_stamp_plots', 'ens_stats_plots']:
+    for key in ['postage_stamp_plots', 'ens_stats_plots']:
+        for field in param[key].keys():
+
+            # Expand clevels, if needed
+            clevels = param[key][field]['cntf_kw']['levels']
+            if type(clevels) is dict:
+                clevels_range = np.arange(clevels['range'][0], clevels['range'][1], clevels['range'][2])
+                param[key][field]['cntf_kw']['levels'] = clevels_range
+            
+            # Use custom colormap dictionary
+            cmap_name = param[key][field]['cntf_kw']['cmap']
+            if type(cmap_name) is str:
+                param[key][field]['cntf_kw']['cmap'] = cmap_dict[cmap_name]
 
     # Create 1D array of average heights AGL
     z1d = ens_avg_z_1d(ens_obj)
@@ -397,9 +415,7 @@ def add_ens_mean_std_K_to_ens_obj(ens_obj, enkf_obj):
     return ens_obj
 
 
-def plot_horiz_slices(ds, field, ens_obj, param, nrows=4, ncols=4, 
-                      klvls=list(range(16)), figsize=(12, 12), verbose=False, cntf_kw={}, 
-                      ob={'plot':False},
+def plot_horiz_slices(ds, field, ens_obj, param, verbose=False, ob={'plot':False},
                       save_dir=None):
     """
     Plot horizontal slices of the desired field at various vertical levels
@@ -414,18 +430,8 @@ def plot_horiz_slices(ds, field, ens_obj, param, nrows=4, ncols=4,
         Ensemble output
     param : dictionary
         YAML inputs
-    nrows : int, optional
-        Number of subplot rows, by default 4
-    ncols : int, optional
-        Number of subplot columns, by default 4
-    klvls : list, optional
-        Vertical levels to plot, by default list(range(16))
-    figsize : tuple, optional
-        Figure size, by default (12, 12)
     verbose : bool, optional
         Option to print extra output, by default False
-    cntf_kw : dict, optional
-        Keyword arguments passed to contourf, by default {}
     ob : dict, optional
         Observation plotting options, by default {'plot':False}
     save_dir : string, optional
@@ -439,8 +445,10 @@ def plot_horiz_slices(ds, field, ens_obj, param, nrows=4, ncols=4,
     """
     
     # Make plot
-    fig = plt.figure(figsize=figsize)
-    for i, k in enumerate(klvls):
+    fig = plt.figure(figsize=param['plot_stat_config']['figsize'])
+    nrows = param['plot_stat_config']['nrows']
+    ncols = param['plot_stat_config']['ncols']
+    for i, k in enumerate(param['plot_stat_config']['klvls']):
         if verbose:
             print(f"plotting k = {k}")
         plot_obj = pmd.PlotOutput([ds], 'upp', fig, nrows, ncols, i+1)
@@ -449,7 +457,8 @@ def plot_horiz_slices(ds, field, ens_obj, param, nrows=4, ncols=4,
         # Skip plotting if < 2 NaN
         make_plot = np.sum(~np.isnan(ds[field][k, :, :])) > 1
         if make_plot:
-            plot_obj.contourf(field, cbar=False, ingest_kw={'zind':[k]}, cntf_kw=cntf_kw)
+            plot_obj.contourf(field, cbar=False, ingest_kw={'zind':[k]}, 
+                              cntf_kw=param['ens_stats_plots'][field]['cntf_kw'])
             cax = plot_obj.cax
             meta = plot_obj.metadata['contourf0']
         else:
@@ -465,7 +474,7 @@ def plot_horiz_slices(ds, field, ens_obj, param, nrows=4, ncols=4,
         plot_obj.set_lim(ens_obj.lat_limits[0], ens_obj.lat_limits[1], 
                          ens_obj.lon_limits[0], ens_obj.lon_limits[1])
         title = 'avg z = {z:.1f} m'.format(z=float(np.mean(ds['HGT_P0_L105_GLC0'][k, :, :] -
-                                                            ds['HGT_P0_L1_GLC0'])))
+                                                           ds['HGT_P0_L1_GLC0'])))
         plot_obj.ax.set_title(title, size=14)
     
     plt.subplots_adjust(left=0.01, right=0.85)
@@ -486,7 +495,7 @@ def plot_horiz_slices(ds, field, ens_obj, param, nrows=4, ncols=4,
 
 
 def plot_horiz_postage_stamp(ens_obj, param, upp_field='TCDC_P0_L105_GLC0', klvl=0, 
-                             ob={'plot':False}, save_dir=None):
+                             ob={'plot':False}, save_dir=None, debug=0):
     """
     Make horizontal cross section postage stamp plots (i.e., one plot per ensemble member)
 
@@ -504,6 +513,8 @@ def plot_horiz_postage_stamp(ens_obj, param, upp_field='TCDC_P0_L105_GLC0', klvl
         Observation plotting options, by default {'plot':False}
     save_dir : string, optional
         Directory to save figure to. Setting to None uses 'out_dir' from param, by default None
+    debug : integer, optional
+        Option to print additional information for debugging. Higher numbers print more output
 
     Returns
     -------
@@ -511,78 +522,19 @@ def plot_horiz_postage_stamp(ens_obj, param, upp_field='TCDC_P0_L105_GLC0', klvl
         Plot
 
     """
-
-    # Field name and colorbar limits/colormap. Set klvl to NaN if 2D field
-    extend = 'both'
-    if save_dir is None:
-        save_dir = param['out_dir']
-    if (upp_field == 'TCDC_P0_L105_GLC0') or (upp_field == 'ana_TCDC_P0_L105_GLC0'):
-        if upp_field == 'TCDC_P0_L105_GLC0':
-            save_fname = f"{save_dir}/postage_stamp_cloud_cover_bgd_{param['save_tag']}.png"
-        else:
-            save_fname = f"{save_dir}/postage_stamp_cloud_cover_ana_{param['save_tag']}.png"
-        title = 'Cloud Cover'
-        cmap = 'plasma_r'
-        clevels = np.arange(0, 100.1, 5)
-        extend = 'neither'
-    elif upp_field == 'incr_TCDC_P0_L105_GLC0':
-        save_fname = f"{save_dir}/postage_stamp_cloud_cover_incr_{param['save_tag']}.png"
-        title = 'Cloud Cover'
-        cmap = 'bwr'
-        clevels = np.arange(-97.5, 97.6, 5)
-
-    elif (upp_field == 'TMP_P0_L105_GLC0') or (upp_field == 'ana_TMP_P0_L105_GLC0'):
-        if upp_field == 'TMP_P0_L105_GLC0':
-            save_fname = f"{save_dir}/postage_stamp_T_bgd_{param['save_tag']}.png"
-        else:
-            save_fname = f"{save_dir}/postage_stamp_T_ana_{param['save_tag']}.png"
-        title = 'Temperature'
-        cmap = 'plasma'
-        clevels = np.arange(250, 270, 1)
-    elif upp_field == 'incr_TMP_P0_L105_GLC0':
-        save_fname = f"{save_dir}/postage_stamp_T_incr_{param['save_tag']}.png"
-        title = 'Temperature'
-        cmap = 'bwr'
-        clevels = np.arange(-5.75, 5.76, 0.5)
     
-    elif (upp_field == 'SPFH_P0_L105_GLC0') or (upp_field == 'ana_SPFH_P0_L105_GLC0'):
-        if upp_field == 'SPFH_P0_L105_GLC0':
-            save_fname = f"{save_dir}/postage_stamp_Q_bgd_{param['save_tag']}.png"
-        else:
-            save_fname = f"{save_dir}/postage_stamp_Q_ana_{param['save_tag']}.png"
-        title = 'Specific Humidity'
-        cmap = 'plasma'
-        clevels = np.arange(0, 5e-3, 2.4e-4)
-        extend = 'max'
-    elif upp_field == 'incr_SPFH_P0_L105_GLC0':
-        save_fname = f"{save_dir}/postage_stamp_Q_incr_{param['save_tag']}.png"
-        title = 'Specific Humidity'
-        cmap = 'bwr'
-        clevels = np.arange(-5.75, 5.76, 0.5) * 1e-4
-
-    elif (upp_field == 'RH_P0_L105_GLC0') or (upp_field == 'ana_RH_P0_L105_GLC0'):
-        if upp_field == 'RH_P0_L105_GLC0':
-            save_fname = f"{save_dir}/postage_stamp_RH_bgd_{param['save_tag']}.png"
-        else:
-            save_fname = f"{save_dir}/postage_stamp_RH_ana_{param['save_tag']}.png"
-        title = 'Relative Humidity'
-        cmap = 'plasma'
-        clevels = np.arange(0, 100.1, 5)
-        extend = 'neither'
-    elif upp_field == 'incr_RH_P0_L105_GLC0':
-        save_fname = f"{save_dir}/postage_stamp_RH_incr_{param['save_tag']}.png"
-        title = 'Relative Humidity'
-        cmap = 'bwr'
-        clevels = np.arange(-5.75, 5.76, 0.5) * 4
-
-    nrows = 5
-    ncols = 6
-    figsize = (12, 10)
+    if debug > 0:
+        print(param['postage_stamp_plots'][upp_field])
 
     # Make plot
-    fig = ens_obj.postage_stamp_contourf(upp_field, nrows, ncols, klvl=klvl, figsize=figsize, title=title,
+    fig = ens_obj.postage_stamp_contourf(upp_field, 
+                                         param['plot_postage_config']['nrows'], 
+                                         param['plot_postage_config']['ncols'], 
+                                         klvl=klvl, 
+                                         figsize=param['plot_postage_config']['figsize'], 
+                                         title=param['postage_stamp_plots'][upp_field]['title'],
                                          plt_kw={'ingest_kw':{'zind':[klvl]}, 
-                                                 'cntf_kw':{'cmap':cmap, 'levels':clevels, 'extend':extend}})
+                                                 'cntf_kw':param['postage_stamp_plots'][upp_field]['cntf_kw']})
     
     # Add location of observation
     if ob['plot']:
@@ -590,6 +542,8 @@ def plot_horiz_postage_stamp(ens_obj, param, upp_field='TCDC_P0_L105_GLC0', klvl
             if type(ax) == cartopy.mpl.geoaxes.GeoAxes:
                 ax.plot(ob['x'], ob['y'], transform=ccrs.PlateCarree(), **ob['kwargs'])
 
+    # Save output
+    save_fname = f"{save_dir}/postage_stamp_{param['postage_stamp_plots'][upp_field]['save_tag']}_{param['save_tag']}.png"
     plt.savefig(save_fname)
 
     return fig
@@ -655,7 +609,7 @@ def plot_cld_obs(ens_obj, param, bins=np.arange(0, 2001, 250), nrows=2, ncols=4,
         borders = cfeature.NaturalEarthFeature(category='cultural',
                                                scale='50m',
                                                facecolor='none',
-                                                name='admin_1_states_provinces')
+                                               name='admin_1_states_provinces')
         axes[-1].add_feature(borders, linewidth=0.25, edgecolor='gray')
         axes[-1].set_title(f"[{bins[i]:.0f}, {bins[i+1]:.0f})", size=14)
     
@@ -676,8 +630,10 @@ if __name__ == '__main__':
 
     # Create plot of observations
     print('create plot with obs cloud fractions')
-    bins = [0] + list(0.5*(ens_z1d[param['plot_klvls']][1:] + ens_z1d[param['plot_klvls']][:-1]))
-    fig = plot_cld_obs(ens_obj, param, bins=bins, nrows=param['plot_nrows'], ncols=param['plot_ncols'],
+    bins = [0] + list(0.5*(ens_z1d[param['plot_stat_config']['klvls']][1:] + 
+                           ens_z1d[param['plot_stat_config']['klvls']][:-1]))
+    fig = plot_cld_obs(ens_obj, param, bins=bins, 
+                       nrows=param['plot_stat_config']['nrows'], ncols=param['plot_stat_config']['ncols'],
                        scatter_kw={'vmin':0, 'vmax':100, 'cmap':'plasma_r', 's':32, 'edgecolors':'k', 'linewidths':0.5})
     plt.savefig(f"{param['out_dir']}/obs_clouds.png")
     plt.close(fig)
@@ -726,24 +682,10 @@ if __name__ == '__main__':
                 print(f'field {field} is missing. Skipping.')
                 continue
             print(f'plotting {field}...')
-            maxval = np.percentile(np.abs(ens_obj.subset_ds[ens_obj.mem_names[0]][field]), 99)
-            minval = np.percentile(np.abs(ens_obj.subset_ds[ens_obj.mem_names[0]][field]), 1)
-            if field.split('_')[1] == 'incr':
-                cmap = 'bwr'
-                clevels = np.linspace(-1, 1, 30) * maxval
-            else:
-                cmap = 'plasma'
-                clevels = np.linspace(minval, maxval, 30)
-            if (maxval == 0) and (minval == 0):
-                clevels = np.linspace(-1, 1, 30)
             fig = plot_horiz_slices(ens_obj.subset_ds[ens_obj.mem_names[0]], 
                                     field,
                                     ens_obj,
                                     param,
-                                    nrows=param['plot_nrows'],
-                                    ncols=param['plot_ncols'],
-                                    klvls=param['plot_klvls'], 
-                                    cntf_kw={'cmap':cmap, 'levels':clevels, 'extend':'both'},
                                     ob={'plot':True,
                                         'x':cld_ob_df['XOB'].values[0] - 360, 
                                         'y':cld_ob_df['YOB'].values[0], 
@@ -755,7 +697,7 @@ if __name__ == '__main__':
         print('Making postage stamp plots')
         klvl = np.argmin(np.abs(ens_z1d - cld_z))
         print(f"postage stamp klvl = {klvl} ({ens_z1d[klvl]} m AGL)")
-        for field in param['postage_stamp_plots']:
+        for field in param['postage_stamp_plots'].keys():
             if field not in ens_obj.subset_ds[ens_obj.mem_names[0]]:
                 print(f'field {field} is missing. Skipping.')
                 continue
@@ -766,7 +708,8 @@ if __name__ == '__main__':
                                                'x':cld_ob_df['XOB'].values[0] - 360, 
                                                'y':cld_ob_df['YOB'].values[0], 
                                                'kwargs':{'marker':'*', 'color':'k'}},
-                                           save_dir=save_dir)
+                                           save_dir=save_dir,
+                                           debug=0)
             plt.close(fig)
         
         # Clean up

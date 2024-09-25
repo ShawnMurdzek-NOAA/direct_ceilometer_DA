@@ -66,7 +66,7 @@ state_vars:
 
 # Tag to add to output files and output file directory
 save_tag: 'S_NewEngland_2022020121_single_ob_test'
-out_dir: '/lfs5/BMC/wrfruc/murdzek/src/direct_ceilometer_DA/tests/data' 
+out_dir: '/lfs5/BMC/wrfruc/murdzek/src/direct_ceilometer_DA/tests/test_out' 
 
 # Misc options
 do_bec: False
@@ -78,43 +78,124 @@ ob_idx:
   - 2
 ob_var: 156.25
 
-# Plotting options
+# Postage stamp plotting options
+# Structure:
+#   <UPP variable name>:
+#     title:
+#     save_tag:
+#     cntf_kw:
+#
+# contour levels (cntf_kw['levels']) can be specified 2 ways:
+#   - A list of values
+#   - The word "range", followed by the start, stop, and step
 postage_stamp_plots:
-  - 'TMP_P0_L105_GLC0'
-  - 'SPFH_P0_L105_GLC0'
-  - 'TCDC_P0_L105_GLC0'
-  - 'RH_P0_L105_GLC0'
-  - 'incr_RH_P0_L105_GLC0'
-  - 'ana_RH_P0_L105_GLC0'
+  RH_P0_L105_GLC0: &RH_postage
+    title: 'Relative Humidity'
+    save_tag: 'RH_bgd'
+    cntf_kw:
+      cmap: 'RH_cmap'
+      extend: 'both'
+      levels:
+        range:
+          - -5
+          - 105.1 
+          - 5
+  TMP_P0_L105_GLC0:
+    title: 'Temperature'
+    save_tag: 'T_bgd'
+    cntf_kw:
+      cmap: 'plasma'
+      extend: 'both'
+      levels:
+        range:
+          - 250
+          - 270 
+          - 1
+  SPFH_P0_L105_GLC0:
+    title: 'Specific Humidity'
+    save_tag: 'Q_bgd'
+    cntf_kw:
+      cmap: 'plasma'
+      extend: 'max'
+      levels:
+        range:
+          - 0
+          - 0.005 
+          - 0.00024
+  TCDC_P0_L105_GLC0: 
+    title: 'Cloud Cover'
+    save_tag: 'cloud_cover_bgd'
+    cntf_kw:
+      cmap: 'plasma_r'
+      extend: 'neither'
+      levels:
+        range:
+          - 0
+          - 100.1 
+          - 5
+  incr_RH_P0_L105_GLC0:
+    title: 'Relative Humidity'
+    save_tag: 'RH_incr'
+    cntf_kw:
+      cmap: 'bwr'
+      extend: 'both'
+      levels:
+        range:
+          - -23
+          - 23.1 
+          - 2
+  ana_RH_P0_L105_GLC0:
+    <<: *RH_postage
+    save_tag: 'RH_ana'
+plot_postage_config:
+  nrows: 5
+  ncols: 6
+  figsize:
+    - 12
+    - 10
+
+# Ensemble statistic plotting options
 ens_stats_plots:
-#  - 'mean_TMP_P0_L105_GLC0'
-#  - 'mean_SPFH_P0_L105_GLC0'
-#  - 'mean_TCDC_P0_L105_GLC0'
-  - 'mean_RH_P0_L105_GLC0'
-#  - 'mean_incr_TMP_P0_L105_GLC0'
-#  - 'mean_incr_SPFH_P0_L105_GLC0'
-#  - 'mean_incr_TCDC_P0_L105_GLC0'
-  - 'mean_incr_RH_P0_L105_GLC0'
-#  - 'mean_ana_TMP_P0_L105_GLC0'
-#  - 'mean_ana_SPFH_P0_L105_GLC0'
-#  - 'mean_ana_TCDC_P0_L105_GLC0'
-  - 'mean_ana_RH_P0_L105_GLC0'
-plot_nrows: 4
-plot_ncols: 4
-plot_klvls:
-  - 2
-  - 4
-  - 6
-  - 8
-  - 10
-  - 12
-  - 14
-  - 16
-  - 17
-  - 18
-  - 19
-  - 20
-  - 22
-  - 24
-  - 26
-  - 28
+  mean_RH_P0_L105_GLC0: &RH_stats
+    cntf_kw:
+      cmap: 'RH_cmap'
+      extend: 'both'
+      levels:
+        range:
+          - -5
+          - 105.1 
+          - 5
+  mean_incr_RH_P0_L105_GLC0:
+    cntf_kw:
+      cmap: 'bwr'
+      extend: 'both'
+      levels:
+        range:
+          - -23
+          - 23.1
+          - 2
+  mean_ana_RH_P0_L105_GLC0:
+    <<: *RH_stats
+plot_stat_config:
+  nrows: 4
+  ncols: 4
+  figsize:
+    - 12
+    - 12
+  klvls:
+    - 2
+    - 4
+    - 6
+    - 8
+    - 10
+    - 12
+    - 14
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 24
+    - 26
+    - 28
