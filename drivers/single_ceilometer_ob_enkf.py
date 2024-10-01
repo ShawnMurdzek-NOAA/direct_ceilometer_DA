@@ -18,6 +18,7 @@ import cartopy.feature as cfeature
 import datetime as dt
 import metpy.calc as mc
 from metpy.units import units
+from metpy.plots import SkewT
 import copy
 import yaml
 
@@ -549,6 +550,51 @@ def plot_horiz_postage_stamp(ens_obj, param, upp_field='TCDC_P0_L105_GLC0', klvl
     return fig
 
 
+def plot_skewt_postage_stamp(ens_obj, param, lat, lon):
+    """
+    Plot skew-Ts for each ensemble member in a postage stamp plot
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+
+    """
+
+    # Create figure
+    fig = plt.figure(figsize=param['plot_postage_config']['figsize'])
+    nrows = param['plot_postage_config']['nrows']
+    ncols = param['plot_postage_config']['ncols']
+
+    # Loop over each ensemble member
+    for i, mem in enumerate(ens_obj.mem_names):
+        skew = SkewT(fig, rotation=45, subplot=[nrows, ncols, i+1])
+        skew.ax.set_xlim(-40, 20)
+        skew.ax.set_ylim(1000, 550)
+
+        # Plot background and analysis
+        for prefix, c, in zip(['', 'ana_'], ['b', 'r']):
+            ens_obj.plot_skewts(lon, lat, fig, names=[mem], 
+                                skew_kw={'hodo':False, 'barbs':False, 'skew':skew, 'bgd_lw':0.25,
+                                         'Tplot_kw':{'linewidth':0.75, 'color':c}, 
+                                         'TDplot_kw':{'linewidth':0.75, 'color':c},
+                                         'fields':{'PRES':'PRES_P0_L105_GLC0',
+                                                   'TMP':f'{prefix}TMP_P0_L105_GLC0',
+                                                   'SPFH':f'{prefix}SPFH_P0_L105_GLC0'}})
+        
+        # Hide tick labels for certain subplots
+        if (i % ncols) != 0:
+            fig.axes[i].yaxis.set_ticklabels([])
+        if i < (ncols * (nrows - 1)):
+            fig.axes[i].xaxis.set_ticklabels([])
+    
+    # Add title
+    plt.suptitle(f"{lat:.2f} deg N, {lon:.2f} deg E", size=16)
+    
+    return fig
+
+
 def plot_cld_obs(ens_obj, param, bins=np.arange(0, 2001, 250), nrows=2, ncols=4, figsize=(10, 10), 
                  hofx_kw={}, scatter_kw={}):
     """
@@ -673,9 +719,22 @@ if __name__ == '__main__':
         ens_obj = compute_ens_incr_3D(ens_obj, "RH_P0_L105_GLC0")
         param['state_vars'].append('RH_P0_L105_GLC0')
 
-        # Plot ensemble mean and standard deviation
+        # Prep for making plots
+        print()
+        print('Plotting section')
         save_dir = f"{param['out_dir']}/{ob_sid}_{ob_idx}"
         os.system(f"mkdir {save_dir}")
+
+        # Make Skew-T postage stamp plots
+        if param['plot_postage_config']['skewt']:
+            print('plotting Skew-T diagram postage stamps...')
+            fig = plot_skewt_postage_stamp(ens_obj, param, 
+                                           cld_ob_df['YOB'].values[0], 
+                                           cld_ob_df['XOB'].values[0] - 360)
+            plt.savefig(f"{save_dir}/postage_stamp_skewt_{param['save_tag']}.pdf")  # Save as a PDF to make it easier to zoom in
+            plt.close(fig)
+
+        # Plot ensemble mean and standard deviation
         print('Making ensemble statistic plots')
         for field in param['ens_stats_plots']:
             if field not in ens_obj.subset_ds[ens_obj.mem_names[0]]:

@@ -153,6 +153,7 @@ plot_postage_config:
   figsize:
     - 12
     - 10
+  skewt: True
 
 # Ensemble statistic plotting options
 ens_stats_plots:
