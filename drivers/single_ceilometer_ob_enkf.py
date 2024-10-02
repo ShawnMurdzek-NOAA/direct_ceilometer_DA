@@ -12,20 +12,16 @@ import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-import cartopy
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
 import datetime as dt
 import metpy.calc as mc
 from metpy.units import units
-from metpy.plots import SkewT
 import copy
 import yaml
 
 import probing_rrfs_ensemble as pre
 import direct_ceilometer_DA.main.cloud_DA_forward_operator as cfo
+import direct_ceilometer_DA.main.cloud_DA_enkf_viz as ens_viz
 from pyDA_utils import enkf
-import pyDA_utils.plot_model_data as pmd
 import pyDA_utils.ensemble_utils as eu
 from pyDA_utils import bufr
 import pyDA_utils.colormaps as cm
@@ -459,253 +455,62 @@ def add_ens_mean_std_K_to_ens_obj(ens_obj, enkf_obj):
     return ens_obj
 
 
-def plot_horiz_slices(ds, field, ens_obj, param, verbose=False, ob={'plot':False},
-                      save_dir=None):
+def run_enkf_1ob(ens_obj, ob_sid, ob_idx, verbose=0):
     """
-    Plot horizontal slices of the desired field at various vertical levels
+    Run EnKF for a single observation
 
     Parameters
     ----------
-    ds : xr.Dataset
-        Output from a single model
-    field : string
-        Field to plot
     ens_obj : pyDA_utils.ensemble_utils.ensemble object
         Ensemble output
-    param : dictionary
-        YAML inputs
-    verbose : bool, optional
-        Option to print extra output, by default False
-    ob : dict, optional
-        Observation plotting options, by default {'plot':False}
-    save_dir : string, optional
-        Directory to save figure to. Setting to None uses 'out_dir' from param, by default None
+    ob_sid : string
+        Observation SID
+    ob_idx : integer
+        Index corresponding to the observation being assimilated
+    verbose : int, optional
+        Verbosity level, by default 1
 
     Returns
     -------
-    fig : plt.figure
-        Figure with the desired plot
-
-    """
-    
-    # Make plot
-    fig = plt.figure(figsize=param['plot_stat_config']['figsize'])
-    nrows = param['plot_stat_config']['nrows']
-    ncols = param['plot_stat_config']['ncols']
-    for i, k in enumerate(param['plot_stat_config']['klvls']):
-        if verbose:
-            print(f"plotting k = {k}")
-        plot_obj = pmd.PlotOutput([ds], 'upp', fig, nrows, ncols, i+1)
-
-        # Make filled contour plot
-        # Skip plotting if < 2 NaN
-        make_plot = np.sum(~np.isnan(ds[field][k, :, :])) > 1
-        if make_plot:
-            plot_obj.contourf(field, cbar=False, ingest_kw={'zind':[k]}, 
-                              cntf_kw=param['ens_stats_plots'][field]['cntf_kw'])
-            cax = plot_obj.cax
-            meta = plot_obj.metadata['contourf0']
-        else:
-            if verbose:
-                print(f"skipping plot for k = {k}")
-            plot_obj.ax = fig.add_subplot(nrows, ncols, i+1, projection=plot_obj.proj)
+    ens_obj : pyDA_utils.ensemble_utils.ensemble object
+        Ensemble output
+    cld_ob_coord : list
+        Observed cloud coordinates in model space. Dimensions: (z, lon, lat)
+    cld_z : float
+        Observed cloud base (m AGL)
         
-        # Add location of observation
-        if ob['plot']:
-            plot_obj.plot(ob['x'], ob['y'], plt_kw=ob['kwargs'])
+    """
 
-        plot_obj.config_ax(grid=False)
-        plot_obj.set_lim(ens_obj.lat_limits[0], ens_obj.lat_limits[1], 
-                         ens_obj.lon_limits[0], ens_obj.lon_limits[1])
-        title = 'avg z = {z:.1f} m'.format(z=float(np.mean(ds['HGT_P0_L105_GLC0'][k, :, :] -
-                                                           ds['HGT_P0_L1_GLC0'])))
-        plot_obj.ax.set_title(title, size=14)
-    
-    plt.subplots_adjust(left=0.01, right=0.85)
+    # Apply cloud DA forward operator
+    cld_amt, cld_z, hofx, cld_ob_coord = run_cld_forward_operator_1ob(ens_obj, ob_sid, ob_idx, 
+                                                                      ens_name=ens_obj.mem_names,
+                                                                      hofx_kw={'hgt_lim_kw':{'max_hgt':3500},
+                                                                               'verbose':0},
+                                                                      verbose=False)
+    if verbose > 0: print('Cloud ceilometer ob hgt =', cld_z)
+    if verbose > 0: print('Cloud ceilometer ob amt =', cld_amt)
+    if verbose > 0: print('Cloud ceilometer H(x) =', hofx)
+    if verbose > 0: print(f"Time to complete forward operator = {(dt.datetime.now() - start_loop).total_seconds()} s")
 
-    cb_ax = fig.add_axes([0.865, 0.02, 0.02, 0.9])
-    cbar = plt.colorbar(cax, cax=cb_ax, orientation='vertical', aspect=35)
-    cbar.set_label(f"{meta['name']} ({meta['units']})", size=14)
-
-    plt.suptitle(field, size=18)
-
-    # Save figure
-    if save_dir is None:
-        plt.savefig(f"{param['out_dir']}/{field}_{param['save_tag']}.png")
+    # Compute localization
+    if param['localization']['use']:
+        start_local = dt.datetime.now()
+        if verbose > 0: print(f"computing localization with lh = {param['localization']['lh']}, lv = {param['localization']['lv']}")
+        C_local = compute_localization_array(ens_obj, param, cld_ob_coord[0], cld_ob_coord[1], cld_ob_coord[2])
+        if verbose > 0: print(f"Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
     else:
-        plt.savefig(f"{save_dir}/{field}_{param['save_tag']}.png")
+        C_local = None
 
-    return fig
+    # Run EnKF
+    enkf_obj = enkf.enkf_1ob(ens_obj.state_matrix['data'], cld_amt, hofx, param['ob_var'], localize=C_local)
+    enkf_obj.EnSRF()
+    if verbose > 0: print(f"Time to complete forward operator and EnSRF = {(dt.datetime.now() - start_loop).total_seconds()} s")
 
+    # Save output to ens_obj for easier plotting
+    ens_obj = add_inc_and_analysis_to_ens_obj(ens_obj, enkf_obj)
+    ens_obj = add_ens_mean_std_K_to_ens_obj(ens_obj, enkf_obj)
 
-def plot_horiz_postage_stamp(ens_obj, param, upp_field='TCDC_P0_L105_GLC0', klvl=0, 
-                             ob={'plot':False}, save_dir=None, debug=0):
-    """
-    Make horizontal cross section postage stamp plots (i.e., one plot per ensemble member)
-
-    Parameters
-    ----------
-    ens_obj : pyDA_utils.ensemble_utils.ensemble
-        Ensemble object
-    param : dictionary
-        YAML inputs
-    upp_field : string, optional
-        UPP field to plot
-    klvl : integer, optional
-        Vertical level to plot
-    ob : dict, optional
-        Observation plotting options, by default {'plot':False}
-    save_dir : string, optional
-        Directory to save figure to. Setting to None uses 'out_dir' from param, by default None
-    debug : integer, optional
-        Option to print additional information for debugging. Higher numbers print more output
-
-    Returns
-    -------
-    fig : plt.figure
-        Plot
-
-    """
-    
-    if debug > 0:
-        print(param['postage_stamp_plots'][upp_field])
-
-    # Make plot
-    fig = ens_obj.postage_stamp_contourf(upp_field, 
-                                         param['plot_postage_config']['nrows'], 
-                                         param['plot_postage_config']['ncols'], 
-                                         klvl=klvl, 
-                                         figsize=param['plot_postage_config']['figsize'], 
-                                         title=param['postage_stamp_plots'][upp_field]['title'],
-                                         plt_kw={'ingest_kw':{'zind':[klvl]}, 
-                                                 'cntf_kw':param['postage_stamp_plots'][upp_field]['cntf_kw']})
-    
-    # Add location of observation
-    if ob['plot']:
-        for ax in fig.axes:
-            if type(ax) == cartopy.mpl.geoaxes.GeoAxes:
-                ax.plot(ob['x'], ob['y'], transform=ccrs.PlateCarree(), **ob['kwargs'])
-
-    # Save output
-    save_fname = f"{save_dir}/postage_stamp_{param['postage_stamp_plots'][upp_field]['save_tag']}_{param['save_tag']}.png"
-    plt.savefig(save_fname)
-
-    return fig
-
-
-def plot_skewt_postage_stamp(ens_obj, param, lat, lon):
-    """
-    Plot skew-Ts for each ensemble member in a postage stamp plot
-
-    Parameters
-    ----------
-
-    Returns
-    -------
-
-    """
-
-    # Create figure
-    fig = plt.figure(figsize=param['plot_postage_config']['figsize'])
-    nrows = param['plot_postage_config']['nrows']
-    ncols = param['plot_postage_config']['ncols']
-
-    # Loop over each ensemble member
-    for i, mem in enumerate(ens_obj.mem_names):
-        skew = SkewT(fig, rotation=45, subplot=[nrows, ncols, i+1])
-        skew.ax.set_xlim(-40, 20)
-        skew.ax.set_ylim(1000, 550)
-
-        # Plot background and analysis
-        for prefix, c, in zip(['', 'ana_'], ['b', 'r']):
-            ens_obj.plot_skewts(lon, lat, fig, names=[mem], 
-                                skew_kw={'hodo':False, 'barbs':False, 'skew':skew, 'bgd_lw':0.25,
-                                         'Tplot_kw':{'linewidth':0.75, 'color':c}, 
-                                         'TDplot_kw':{'linewidth':0.75, 'color':c},
-                                         'fields':{'PRES':'PRES_P0_L105_GLC0',
-                                                   'TMP':f'{prefix}TMP_P0_L105_GLC0',
-                                                   'SPFH':f'{prefix}SPFH_P0_L105_GLC0'}})
-        
-        # Hide tick labels for certain subplots
-        if (i % ncols) != 0:
-            fig.axes[i].yaxis.set_ticklabels([])
-        if i < (ncols * (nrows - 1)):
-            fig.axes[i].xaxis.set_ticklabels([])
-    
-    # Add title
-    plt.suptitle(f"{lat:.2f} deg N, {lon:.2f} deg E", size=16)
-    
-    return fig
-
-
-def plot_cld_obs(ens_obj, param, bins=np.arange(0, 2001, 250), nrows=2, ncols=4, figsize=(10, 10), 
-                 hofx_kw={}, scatter_kw={}):
-    """
-    Plot ceilometer obs in horizontal slices for various vertical bins
-
-    Parameters
-    ----------
-    ens_obj : pyDA_utils.ensemble_utils.ensemble
-        Ensemble object
-    param : dictionary
-        YAML inputs
-    bins : array, optional
-        Vertical bins used to sort ceilometer obs, by default np.arange(0, 2001, 250)
-    nrows : int, optional
-        Number of subplot rows, by default 2
-    ncols : int, optional
-        Number of subplot columns, by default 4
-    figsize : tuple, optional
-        Figure size, by default (10, 10)
-    hofx_kw : dict, optional
-        Keyword arguments passed to cfo.ceilometer_hofx_driver(), by default {}
-    scatter_kw : dict, optional
-        Keyword arbuments passed to plt.scatter(), by default {}
-
-    Returns
-    -------
-    fig : plt.figure()
-        Plot with desired figure
-
-    """
-
-    # Extract cloud obs
-    bufr_df = ens_obj._subset_bufr(['ADPSFC', 'MSONET'], DHR=np.nan)
-    cld_ob_df = cfo.remove_missing_cld_ob(bufr_df)
-    cld_hofx = cfo.ceilometer_hofx_driver(cld_ob_df, ens_obj.subset_ds[ens_obj.mem_names[0]], **hofx_kw)
-
-    # Make plot
-    fig = plt.figure(figsize=figsize)
-    axes = []
-    for i in range(len(bins) - 1):
-
-        # Extract obs within this height bin
-        obs = {'lat':[], 'lon':[], 'ob_cld_amt':[]}
-        for j in range(len(cld_hofx.data['HOCB'])):
-            ob_idx = np.where(np.logical_and(cld_hofx.data['HOCB'][j] >= bins[i],
-                                             cld_hofx.data['HOCB'][j] < bins[i+1]))[0]
-            for k in ob_idx:
-                obs['lat'].append(cld_hofx.data['lat'][j])
-                obs['lon'].append(cld_hofx.data['lon'][j])
-                obs['ob_cld_amt'].append(cld_hofx.data['ob_cld_amt'][j][k])
-
-        # Make plot
-        axes.append(fig.add_subplot(nrows, ncols, i+1, projection=ccrs.LambertConformal()))
-        cax = axes[-1].scatter(obs['lon'], obs['lat'], c=obs['ob_cld_amt'], transform=ccrs.PlateCarree(),
-                               **scatter_kw)
-        axes[-1].set_extent([param['min_lon'], param['max_lon'], param['min_lat'], param['max_lat']])
-        axes[-1].coastlines('50m', edgecolor='gray', linewidth=0.25)
-        borders = cfeature.NaturalEarthFeature(category='cultural',
-                                               scale='50m',
-                                               facecolor='none',
-                                               name='admin_1_states_provinces')
-        axes[-1].add_feature(borders, linewidth=0.25, edgecolor='gray')
-        axes[-1].set_title(f"[{bins[i]:.0f}, {bins[i+1]:.0f})", size=14)
-    
-    cbar = plt.colorbar(cax, ax=axes, orientation='vertical')
-    cbar.set_label('observed cloud percentage', size=14)
-
-    return fig
+    return ens_obj, cld_ob_coord, cld_z
 
 
 if __name__ == '__main__':
@@ -721,9 +526,9 @@ if __name__ == '__main__':
     print('create plot with obs cloud fractions')
     bins = [0] + list(0.5*(ens_z1d[param['plot_stat_config']['klvls']][1:] + 
                            ens_z1d[param['plot_stat_config']['klvls']][:-1]))
-    fig = plot_cld_obs(ens_obj, param, bins=bins, 
-                       nrows=param['plot_stat_config']['nrows'], ncols=param['plot_stat_config']['ncols'],
-                       scatter_kw={'vmin':0, 'vmax':100, 'cmap':'plasma_r', 's':32, 'edgecolors':'k', 'linewidths':0.5})
+    fig = ens_viz.plot_cld_obs(ens_obj, param, bins=bins, 
+                               nrows=param['plot_stat_config']['nrows'], ncols=param['plot_stat_config']['ncols'],
+                               scatter_kw={'vmin':0, 'vmax':100, 'cmap':'plasma_r', 's':32, 'edgecolors':'k', 'linewidths':0.5})
     plt.savefig(f"{param['out_dir']}/obs_clouds.png")
     plt.close(fig)
 
@@ -735,34 +540,8 @@ if __name__ == '__main__':
         print('-----------------------------------------------')
         print(f"Starting single-ob test for {ob_sid} {ob_idx}")
 
-        # Apply cloud DA forward operator
-        cld_amt, cld_z, hofx, cld_ob_coord = run_cld_forward_operator_1ob(ens_obj, ob_sid, ob_idx, 
-                                                                          ens_name=ens_obj.mem_names,
-                                                                          hofx_kw={'hgt_lim_kw':{'max_hgt':3500},
-                                                                                   'verbose':0},
-                                                                          verbose=False)
-        print('Cloud ceilometer ob hgt =', cld_z)
-        print('Cloud ceilometer ob amt =', cld_amt)
-        print('Cloud ceilometer H(x) =', hofx)
-        print(f"Time to complete forward operator = {(dt.datetime.now() - start_loop).total_seconds()} s")
-
-        # Compute localization
-        if param['localization']['use']:
-            start_local = dt.datetime.now()
-            print(f"computing localization with lh = {param['localization']['lh']}, lv = {param['localization']['lv']}")
-            C_local = compute_localization_array(ens_obj, param, cld_ob_coord[0], cld_ob_coord[1], cld_ob_coord[2])
-            print(f"Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
-        else:
-            C_local = None
-
         # Run EnKF
-        enkf_obj = enkf.enkf_1ob(ens_obj.state_matrix['data'], cld_amt, hofx, param['ob_var'], localize=C_local)
-        enkf_obj.EnSRF()
-        print(f"Time to complete forward operator and EnSRF = {(dt.datetime.now() - start_loop).total_seconds()} s")
-
-        # Save output to ens_obj for easier plotting
-        ens_obj = add_inc_and_analysis_to_ens_obj(ens_obj, enkf_obj)
-        ens_obj = add_ens_mean_std_K_to_ens_obj(ens_obj, enkf_obj)
+        ens_obj, cld_ob_coord, cld_z = run_enkf_1ob(ens_obj, ob_sid, ob_idx, verbose=1)
 
         # Compute RH as well as ensemble stats for RH
         for p in ['', 'ana_']:
@@ -780,7 +559,7 @@ if __name__ == '__main__':
         # Make Skew-T postage stamp plots
         if param['plot_postage_config']['skewt']:
             print('plotting Skew-T diagram postage stamps...')
-            fig = plot_skewt_postage_stamp(ens_obj, param, cld_ob_coord[2], cld_ob_coord[1])
+            fig = ens_viz.plot_skewt_postage_stamp(ens_obj, param, cld_ob_coord[2], cld_ob_coord[1])
             plt.savefig(f"{save_dir}/postage_stamp_skewt_{param['save_tag']}.pdf")  # Save as a PDF to make it easier to zoom in
             plt.close(fig)
 
@@ -791,15 +570,15 @@ if __name__ == '__main__':
                 print(f'field {field} is missing. Skipping.')
                 continue
             print(f'plotting {field}...')
-            fig = plot_horiz_slices(ens_obj.subset_ds[ens_obj.mem_names[0]], 
-                                    field,
-                                    ens_obj,
-                                    param,
-                                    ob={'plot':True,
-                                        'x':cld_ob_coord[1], 
-                                        'y':cld_ob_coord[2], 
-                                        'kwargs':{'marker':'*', 'color':'k'}},
-                                    save_dir=save_dir)
+            fig = ens_viz.plot_horiz_slices(ens_obj.subset_ds[ens_obj.mem_names[0]], 
+                                            field,
+                                            ens_obj,
+                                            param,
+                                            ob={'plot':True,
+                                                'x':cld_ob_coord[1], 
+                                                'y':cld_ob_coord[2], 
+                                                'kwargs':{'marker':'*', 'color':'k'}},
+                                            save_dir=save_dir)
             plt.close(fig)
 
         # Make postage stamp plots
@@ -811,14 +590,14 @@ if __name__ == '__main__':
                 print(f'field {field} is missing. Skipping.')
                 continue
             print(f'plotting {field}...')
-            fig = plot_horiz_postage_stamp(ens_obj, param, upp_field=field, 
-                                           klvl=klvl,
-                                           ob={'plot':True,
-                                               'x':cld_ob_coord[1], 
-                                               'y':cld_ob_coord[2], 
-                                               'kwargs':{'marker':'*', 'color':'k'}},
-                                           save_dir=save_dir,
-                                           debug=0)
+            fig = ens_viz.plot_horiz_postage_stamp(ens_obj, param, upp_field=field, 
+                                                   klvl=klvl,
+                                                   ob={'plot':True,
+                                                       'x':cld_ob_coord[1], 
+                                                       'y':cld_ob_coord[2], 
+                                                       'kwargs':{'marker':'*', 'color':'k'}},
+                                                   save_dir=save_dir,
+                                                   debug=0)
             plt.close(fig)
         
         # Clean up
