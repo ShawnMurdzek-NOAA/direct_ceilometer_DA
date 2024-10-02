@@ -29,6 +29,7 @@ import pyDA_utils.plot_model_data as pmd
 import pyDA_utils.ensemble_utils as eu
 from pyDA_utils import bufr
 import pyDA_utils.colormaps as cm
+import pyDA_utils.localization as local
 
 
 #---------------------------------------------------------------------------------------------------
@@ -159,8 +160,8 @@ def run_cld_forward_operator_1ob(ens_obj, ob_sid, ob_idx, ens_name=['mem0001'], 
         Observed cloud base (m AGL)
     hofx_output : list
         Model cloud amount from each ensemble member (%). Height is the same as cld_z.
-    cld_ob_df : pd.DataFrame
-        All ceilometer observations (excluding those added by the forward operator) for ob_sid
+    cld_coord_model : list
+        Observation location in model coordinates (z, lon, lat)
 
     """
     
@@ -170,6 +171,7 @@ def run_cld_forward_operator_1ob(ens_obj, ob_sid, ob_idx, ens_name=['mem0001'], 
     bufr_df = ens_obj._subset_bufr(['ADPSFC', 'MSONET'], DHR=np.nan)
     dum = bufr_df.loc[bufr_df['SID'] == ob_sid, :]
     cld_ob_df = cfo.remove_missing_cld_ob(dum)
+    cld_coord_model = [0, cld_ob_df['XOB'].values[0] - 360, cld_ob_df['YOB'].values[0]]
     if verbose: print("Observation:\n", cld_ob_df.loc[:, ['TYP', 'SID', 'XOB', 'YOB', 'CLAM', 'HOCB']])
     
     # Run forward operator
@@ -187,8 +189,49 @@ def run_cld_forward_operator_1ob(ens_obj, ob_sid, ob_idx, ens_name=['mem0001'], 
         hofx_output[i] = cld_hofx.data['hofx'][0][ob_idx]
         cld_amt = cld_hofx.data['ob_cld_amt'][0][ob_idx]
         cld_z = cld_hofx.data['HOCB'][0][ob_idx]
+        cld_coord_model[0] = cld_coord_model[0] + cld_hofx.data['ob_hgt_model'][0][ob_idx]
+    cld_coord_model[0] = cld_coord_model[0] / len(ens_name)
     
-    return cld_amt, cld_z, hofx_output, cld_ob_df
+    return cld_amt, cld_z, hofx_output, cld_coord_model
+
+
+def compute_localization_array(ens_obj, param, z, lon, lat):
+    """
+    Compute localization array for EnKF DA
+
+    Parameters
+    ----------
+    ens_obj : pyDA_utils.ensemble_utils.ensemble object
+        Ensemble output
+    param : dictionary
+        YAML inputs
+    z : float
+        Observation height
+    lon : float
+        Observation longitude (deg E)
+    lat : float
+        Observation latitude (deg N)
+    
+    Returns
+    -------
+    C : np.ndarray
+        Localization array
+
+    """
+  
+    # Use Gaspari and Cohn (1999) 5th-order localization fct
+    local_fct = local.localization_fct(local.gaspari_cohn_5ord)
+
+    # Extract information needed to compute localization
+    model_pts = ens_obj.state_matrix['loc']
+    ob_pt = np.array([z, lat, lon])
+    lh = param['localization']['lh']
+    lv = param['localization']['lv']
+
+    # Compute localization
+    C = local_fct.compute_localization(model_pts, ob_pt, lv, lh)
+
+    return C
 
 
 def unravel_state_matrix(x, ens_obj, ens_dim=True):
@@ -693,18 +736,27 @@ if __name__ == '__main__':
         print(f"Starting single-ob test for {ob_sid} {ob_idx}")
 
         # Apply cloud DA forward operator
-        cld_amt, cld_z, hofx, cld_ob_df = run_cld_forward_operator_1ob(ens_obj, ob_sid, ob_idx, 
-                                                                    ens_name=ens_obj.mem_names,
-                                                                    hofx_kw={'hgt_lim_kw':{'max_hgt':3500},
-                                                                                'verbose':0},
-                                                                    verbose=False)
+        cld_amt, cld_z, hofx, cld_ob_coord = run_cld_forward_operator_1ob(ens_obj, ob_sid, ob_idx, 
+                                                                          ens_name=ens_obj.mem_names,
+                                                                          hofx_kw={'hgt_lim_kw':{'max_hgt':3500},
+                                                                                   'verbose':0},
+                                                                          verbose=False)
         print('Cloud ceilometer ob hgt =', cld_z)
         print('Cloud ceilometer ob amt =', cld_amt)
         print('Cloud ceilometer H(x) =', hofx)
         print(f"Time to complete forward operator = {(dt.datetime.now() - start_loop).total_seconds()} s")
 
+        # Compute localization
+        if param['localization']['use']:
+            start_local = dt.datetime.now()
+            print(f"computing localization with lh = {param['localization']['lh']}, lv = {param['localization']['lv']}")
+            C_local = compute_localization_array(ens_obj, param, cld_ob_coord[0], cld_ob_coord[1], cld_ob_coord[2])
+            print(f"Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
+        else:
+            C_local = None
+
         # Run EnKF
-        enkf_obj = enkf.enkf_1ob(ens_obj.state_matrix['data'], cld_amt, hofx, param['ob_var'])
+        enkf_obj = enkf.enkf_1ob(ens_obj.state_matrix['data'], cld_amt, hofx, param['ob_var'], localize=C_local)
         enkf_obj.EnSRF()
         print(f"Time to complete forward operator and EnSRF = {(dt.datetime.now() - start_loop).total_seconds()} s")
 
@@ -728,9 +780,7 @@ if __name__ == '__main__':
         # Make Skew-T postage stamp plots
         if param['plot_postage_config']['skewt']:
             print('plotting Skew-T diagram postage stamps...')
-            fig = plot_skewt_postage_stamp(ens_obj, param, 
-                                           cld_ob_df['YOB'].values[0], 
-                                           cld_ob_df['XOB'].values[0] - 360)
+            fig = plot_skewt_postage_stamp(ens_obj, param, cld_ob_coord[2], cld_ob_coord[1])
             plt.savefig(f"{save_dir}/postage_stamp_skewt_{param['save_tag']}.pdf")  # Save as a PDF to make it easier to zoom in
             plt.close(fig)
 
@@ -746,8 +796,8 @@ if __name__ == '__main__':
                                     ens_obj,
                                     param,
                                     ob={'plot':True,
-                                        'x':cld_ob_df['XOB'].values[0] - 360, 
-                                        'y':cld_ob_df['YOB'].values[0], 
+                                        'x':cld_ob_coord[1], 
+                                        'y':cld_ob_coord[2], 
                                         'kwargs':{'marker':'*', 'color':'k'}},
                                     save_dir=save_dir)
             plt.close(fig)
@@ -764,8 +814,8 @@ if __name__ == '__main__':
             fig = plot_horiz_postage_stamp(ens_obj, param, upp_field=field, 
                                            klvl=klvl,
                                            ob={'plot':True,
-                                               'x':cld_ob_df['XOB'].values[0] - 360, 
-                                               'y':cld_ob_df['YOB'].values[0], 
+                                               'x':cld_ob_coord[1], 
+                                               'y':cld_ob_coord[2], 
                                                'kwargs':{'marker':'*', 'color':'k'}},
                                            save_dir=save_dir,
                                            debug=0)

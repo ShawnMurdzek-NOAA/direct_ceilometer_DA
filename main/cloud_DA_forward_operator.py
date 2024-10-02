@@ -118,7 +118,7 @@ class sfc_cld_forward_operator():
 
 
     def interp_model_col_to_ob(self, method='nearest', proj_str='+proj=lcc +lat_0=39 +lon_0=-96 +lat_1=33 +lat_2=45',
-                               fields=['TCDC_P0_L105_GLC0', 'height_agl']):
+                               fields=['TCDC_P0_L105_GLC0', 'height_agl'], zgrid='lv_HYBL2'):
         """
         Wrapper method for interpolation of model vertical columns to ceilometer (lat, lon) locations
 
@@ -130,6 +130,8 @@ class sfc_cld_forward_operator():
             Map projection string for pyproj
         fields : list of strings, optional
             Model fields to interpolate
+        zgrid : string
+            Name of model vertical grid
         
         Returns
         -------
@@ -148,6 +150,9 @@ class sfc_cld_forward_operator():
             self._model_nearest_interp_col(fields=fields)
         else:
             print(f'method {method} is not supported')
+
+        # Add vertical grid levels
+        self.data['model_zgrid'] = [self.model_ds[zgrid].values] * len(self.data['idx'])
         
         if self.debug > 0:
             print('sfc_cld_forward_operator: Finished interpolating model output columns ' +
@@ -210,7 +215,7 @@ class sfc_cld_forward_operator():
         Parameters
         ----------
         fields : list of strings, optional
-            Fields to interpolat
+            Fields to interpolate
         
         Returns
         -------
@@ -235,7 +240,7 @@ class sfc_cld_forward_operator():
     
 
     def impose_hgt_limits(self, min_hgt=10, max_hgt=3658, hgt_field='model_col_height_agl',
-                          fields=['model_col_height_agl', 'model_col_TCDC_P0_L105_GLC0']):
+                          fields=['model_col_height_agl', 'model_col_TCDC_P0_L105_GLC0', 'model_zgrid']):
         """
         Impose min and max height limits to either the model or obs
 
@@ -288,6 +293,36 @@ class sfc_cld_forward_operator():
             # Should correspond to minimum cloud fraction that ceilometer can observe
             cond_0 = self.data[field][i] <= min_cld_frac
             self.data[field][i][cond_0] = 0
+
+    
+    def interp_ob_hgt_to_model_grid(self):
+        """
+        Interpolate observation heights to model level coordinates
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None. Adds the 'ob_hgt_model' field to self.data
+
+        Notes
+        -----
+        Having ceilometer heights in model level coordinates is useful when applying localization in 
+        the vertical
+
+        """
+
+        self.data['ob_hgt_model'] = []
+        for i in self.data['idx']:
+            try:
+                model_z = self.data['model_col_height_agl'][i]
+                model_i = self.data['model_zgrid'][i]
+            except KeyError:
+                print("In interp_ob_hgt_to_model_grid: Must interpolate model columns to ob locations first")
+                raise KeyError
+            self.data['ob_hgt_model'].append(np.interp(self.data['HOCB'][i], model_z, model_i))
 
 
     def clean_obs(self):
@@ -629,7 +664,7 @@ def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1,
 
     if verbose > 0: print('Imposing height limits and min cld fraction...')
     cld_hofx.impose_hgt_limits(hgt_field='model_col_height_agl',
-                               fields=['model_col_height_agl', 'model_col_TCDC_P0_L105_GLC0'],
+                               fields=['model_col_height_agl', 'model_col_TCDC_P0_L105_GLC0', 'model_zgrid'],
                                **hgt_lim_kw)
     cld_hofx.impose_min_cld_frac(**min_frac_kw)
 
@@ -649,6 +684,9 @@ def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1,
     cld_hofx.add_clear_obs(**clr_ob_kw)
     cld_hofx.decode_ob_clam()
     cld_hofx.interp_model_to_obs(**interp_z_kw)
+
+    if verbose > 0: print('Interpolating ob heights to model coordinates (needed if localization is desired)')
+    cld_hofx.interp_ob_hgt_to_model_grid()
 
     return cld_hofx
     

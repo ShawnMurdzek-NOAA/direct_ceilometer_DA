@@ -8,7 +8,8 @@ slurm*.out
 # Ignore images files (except in test directory)
 *.png
 *.pdf
-!tests/data/*_original/*.png
+!tests/data/*ruth/*/*.png
+!tests/data/*ruth/*.png
 !tests/data/*.png
 
 # Ignore core dumps

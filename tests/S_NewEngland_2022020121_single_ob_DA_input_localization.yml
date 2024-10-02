@@ -66,7 +66,7 @@ state_vars:
 
 # Tag to add to output files and output file directory
 save_tag: 'S_NewEngland_2022020121_single_ob_test'
-out_dir: '/lfs5/BMC/wrfruc/murdzek/src/direct_ceilometer_DA/tests/test_out' 
+out_dir: '/lfs5/BMC/wrfruc/murdzek/src/direct_ceilometer_DA/tests/test_localize_out' 
 
 # Misc options
 do_bec: False
@@ -81,7 +81,7 @@ ob_var: 156.25
 # Localization options
 # lh is in km, lv is in model vertical levels
 localization:
-  use: False
+  use: True
   lh: 50
   lv: 4
 
