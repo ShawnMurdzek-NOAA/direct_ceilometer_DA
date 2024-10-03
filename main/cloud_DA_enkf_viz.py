@@ -26,8 +26,7 @@ import pyDA_utils.plot_model_data as pmd
 # Functions
 #---------------------------------------------------------------------------------------------------
 
-def plot_horiz_slices(ds, field, ens_obj, param, verbose=False, ob={'plot':False},
-                      save_dir=None):
+def plot_horiz_slices(ds, field, ens_obj, param, verbose=False, ob_coord=[], save_dir=None):
     """
     Plot horizontal slices of the desired field at various vertical levels
 
@@ -43,8 +42,8 @@ def plot_horiz_slices(ds, field, ens_obj, param, verbose=False, ob={'plot':False
         YAML inputs
     verbose : bool, optional
         Option to print extra output, by default False
-    ob : dict, optional
-        Observation plotting options, by default {'plot':False}
+    ob_coord : np.array, optional
+        Observation coordinates, (lon, lat)
     save_dir : string, optional
         Directory to save figure to. Setting to None uses 'out_dir' from param, by default None
 
@@ -77,9 +76,9 @@ def plot_horiz_slices(ds, field, ens_obj, param, verbose=False, ob={'plot':False
                 print(f"skipping plot for k = {k}")
             plot_obj.ax = fig.add_subplot(nrows, ncols, i+1, projection=plot_obj.proj)
         
-        # Add location of observation
-        if ob['plot']:
-            plot_obj.plot(ob['x'], ob['y'], plt_kw=ob['kwargs'])
+        # Add location of observations
+        if param['ens_stats_plots'][field]['ob_plot']['use']:
+            plot_obj.plot(ob_coord[:, 0], ob_coord[:, 1], plt_kw=param['ens_stats_plots'][field]['ob_plot']['kw'])
 
         plot_obj.config_ax(grid=False)
         plot_obj.set_lim(ens_obj.lat_limits[0], ens_obj.lat_limits[1], 
@@ -105,8 +104,8 @@ def plot_horiz_slices(ds, field, ens_obj, param, verbose=False, ob={'plot':False
     return fig
 
 
-def plot_horiz_postage_stamp(ens_obj, param, upp_field='TCDC_P0_L105_GLC0', klvl=0, 
-                             ob={'plot':False}, save_dir=None, debug=0):
+def plot_horiz_postage_stamp(ens_obj, param, upp_field='bgd_TCDC_P0_L105_GLC0', klvl=0, 
+                             ob_coord=[], save_dir=None, debug=0):
     """
     Make horizontal cross section postage stamp plots (i.e., one plot per ensemble member)
 
@@ -120,8 +119,8 @@ def plot_horiz_postage_stamp(ens_obj, param, upp_field='TCDC_P0_L105_GLC0', klvl
         UPP field to plot
     klvl : integer, optional
         Vertical level to plot
-    ob : dict, optional
-        Observation plotting options, by default {'plot':False}
+    ob_coord : np.array, optional
+        Observation coordinates, (lon, lat)
     save_dir : string, optional
         Directory to save figure to. Setting to None uses 'out_dir' from param, by default None
     debug : integer, optional
@@ -148,10 +147,11 @@ def plot_horiz_postage_stamp(ens_obj, param, upp_field='TCDC_P0_L105_GLC0', klvl
                                                  'cntf_kw':param['postage_stamp_plots'][upp_field]['cntf_kw']})
     
     # Add location of observation
-    if ob['plot']:
+    if param['postage_stamp_plots'][upp_field]['ob_plot']['use']:
         for ax in fig.axes:
             if type(ax) == cartopy.mpl.geoaxes.GeoAxes:
-                ax.plot(ob['x'], ob['y'], transform=ccrs.PlateCarree(), **ob['kwargs'])
+                ax.plot(ob_coord[:, 0], ob_coord[:, 1], transform=ccrs.PlateCarree(),
+                        **param['postage_stamp_plots'][upp_field]['ob_plot']['kw'])
 
     # Save output
     save_fname = f"{save_dir}/postage_stamp_{param['postage_stamp_plots'][upp_field]['save_tag']}_{param['save_tag']}.png"
@@ -194,7 +194,7 @@ def plot_skewt_postage_stamp(ens_obj, param, lat, lon):
         skew.ax.set_ylim(1000, 550)
 
         # Plot background and analysis
-        for prefix, c, in zip(['', 'ana_'], ['b', 'r']):
+        for prefix, c, in zip(['bgd_', 'ana_'], ['b', 'r']):
             ens_obj.plot_skewts(lon, lat, fig, names=[mem], 
                                 skew_kw={'hodo':False, 'barbs':False, 'skew':skew, 'bgd_lw':0.25,
                                          'Tplot_kw':{'linewidth':0.75, 'color':c}, 
@@ -283,6 +283,72 @@ def plot_cld_obs(ens_obj, param, bins=np.arange(0, 2001, 250), nrows=2, ncols=4,
     cbar.set_label('observed cloud percentage', size=14)
 
     return fig
+
+
+def plot_driver(ens_obj, param, save_dir, ob_coord, ens_zlvls, ens_z1d, verbose=0):
+    """
+    Run code to plot Skew-Ts, ensemble statistics, and postage stamp plots
+
+    Parameters
+    ----------
+    ens_obj : pyDA_utils.ensemble_utils.ensemble
+        Ensemble object
+    param : dictionary
+        YAML inputs
+    save_dir : string
+        Directory to save figures to
+    ob_coord : 2D np.array
+        Observation coordinates. Dimensions: (nobs, [z, lon, lat])
+    ens_zlvls : 1D np.array
+        Integer values corresponding to the model vertical levels
+    ens_z1d: 1D np.array
+        Average height for each model vertical level
+    verbose: integer, optional
+        Verbosity level
+    
+    Returns
+    -------
+    None
+
+    """
+
+    # Make Skew-T postage stamp plots for the first observation location
+    if param['plot_postage_config']['skewt']:
+        if verbose > 0: print('plotting Skew-T diagram postage stamps...')
+        fig = plot_skewt_postage_stamp(ens_obj, param, ob_coord[0, 2], ob_coord[0, 1])
+        plt.savefig(f"{save_dir}/postage_stamp_skewt_{param['save_tag']}.pdf")  # Save as a PDF to make it easier to zoom in
+        plt.close(fig)
+
+    # Plot ensemble mean and standard deviation
+    if verbose > 0: print('Making ensemble statistic plots')
+    for field in param['ens_stats_plots']:
+        if field not in ens_obj.subset_ds[ens_obj.mem_names[0]]:
+            if verbose > 0: print(f'field {field} is missing. Skipping.')
+            continue
+        if verbose > 0: print(f'plotting {field}...')
+        fig = plot_horiz_slices(ens_obj.subset_ds[ens_obj.mem_names[0]], 
+                                field,
+                                ens_obj,
+                                param,
+                                ob_coord=ob_coord[:, 1:],
+                                save_dir=save_dir)
+        plt.close(fig)
+
+    # Make postage stamp plots
+    if verbose > 0: print('Making postage stamp plots')
+    klvl = np.argmin(np.abs(ens_zlvls - np.mean(ob_coord[:, 0])))
+    if verbose > 0: print(f"postage stamp klvl = {klvl} ({ens_z1d[klvl]} m AGL)")
+    for field in param['postage_stamp_plots'].keys():
+        if field not in ens_obj.subset_ds[ens_obj.mem_names[0]]:
+            print(f'field {field} is missing. Skipping.')
+            continue
+        if verbose > 0: print(f'plotting {field}...')
+        fig = plot_horiz_postage_stamp(ens_obj, param, upp_field=field, 
+                                       klvl=klvl,
+                                       ob_coord=ob_coord[:, 1:],
+                                       save_dir=save_dir,
+                                       debug=0)
+        plt.close(fig)
 
 
 """

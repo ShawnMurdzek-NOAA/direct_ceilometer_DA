@@ -1,5 +1,5 @@
 """
-Single Observation Ceilometer Test Using an EnSRF
+Ceilometer Observation DA Tests Using an EnKF
 
 shawn.s.murdzek@noaa.gov
 """
@@ -45,19 +45,33 @@ def ens_avg_z_1d(ens_obj):
     -------
     z1d : array
         Average height AGL for each model level
+    zlvls : array
+        Index corresponding to each model level
 
     """
 
     mem_name = ens_obj.mem_names[0]
     z1d = np.mean(ens_obj.subset_ds[mem_name]['HGT_P0_L105_GLC0'].values - 
                   ens_obj.subset_ds[mem_name]['HGT_P0_L1_GLC0'].values[np.newaxis, :, :], axis=(1, 2))
+    zlvls = ens_obj.subset_ds[mem_name]['lv_HYBL2'].values
 
-    return z1d
+    return z1d, zlvls
 
 
 def read_ens_from_nc(param):
     """
     Read in an ensemble subset from a netCDF file
+
+    Parameters
+    ----------
+    param : dictionary
+        Input parameters
+    
+    Returns
+    -------
+    ens_obj : pyDA_utils.ensemble_utils.ensemble object
+        Ensemble output
+
     """
 
     ens_obj = eu.read_subset_ens_nc(param['subset_ens_nc'])
@@ -69,9 +83,45 @@ def read_ens_from_nc(param):
     return ens_obj
 
 
+def reformat_param_plot_opts(param):
+    """
+    Reformat plotting options in input parameters.
+
+    Reformatting includes adding custom colormaps and constructing contour intervals
+
+    Parameters
+    ----------
+    param : dictionary
+        Input parameters
+    
+    Returns
+    -------
+    param : dictionary
+        Input parameters
+
+    """
+
+    cmap_dict = cm.generate_cust_cmaps_dict()
+    for key in ['postage_stamp_plots', 'ens_stats_plots']:
+        for field in param[key].keys():
+
+            # Expand clevels, if needed
+            clevels = param[key][field]['cntf_kw']['levels']
+            if type(clevels) is dict:
+                clevels_range = np.arange(clevels['range'][0], clevels['range'][1], clevels['range'][2])
+                param[key][field]['cntf_kw']['levels'] = clevels_range
+            
+            # Use custom colormap dictionary
+            cmap_name = param[key][field]['cntf_kw']['cmap']
+            if type(cmap_name) is str:
+                param[key][field]['cntf_kw']['cmap'] = cmap_dict[cmap_name]
+    
+    return param
+
+
 def read_preprocess_ens(yml_fname):
     """
-    Read in and preprocess ensemble output
+    Read input YAML file, then read in and preprocess ensemble output
 
     Parameters
     ----------
@@ -94,9 +144,12 @@ def read_preprocess_ens(yml_fname):
 
     """
 
-    # Read input data
+    # Read input parameters
     with open(yml_fname, 'r') as fptr:
         param = yaml.safe_load(fptr)
+    param = reformat_param_plot_opts(param)
+
+    # Read in ensemble output
     try:
         ens_obj = read_ens_from_nc(param)
         print('using subset ensemble output from netCDF file')
@@ -104,28 +157,16 @@ def read_preprocess_ens(yml_fname):
         ens_obj = pre.read_ensemble_output(param)
         if param['save_to_nc']:
             ens_obj.save_subset_ens(param['subset_ens_nc'])
-
-    # Reformat plotting options
-    cmap_dict = cm.generate_cust_cmaps_dict()
-    #for key in ['postage_stamp_plots', 'ens_stats_plots']:
-    for key in ['postage_stamp_plots', 'ens_stats_plots']:
-        for field in param[key].keys():
-
-            # Expand clevels, if needed
-            clevels = param[key][field]['cntf_kw']['levels']
-            if type(clevels) is dict:
-                clevels_range = np.arange(clevels['range'][0], clevels['range'][1], clevels['range'][2])
-                param[key][field]['cntf_kw']['levels'] = clevels_range
-            
-            # Use custom colormap dictionary
-            cmap_name = param[key][field]['cntf_kw']['cmap']
-            if type(cmap_name) is str:
-                param[key][field]['cntf_kw']['cmap'] = cmap_dict[cmap_name]
+    
+    # Save background fields
+    for ens in ens_obj.mem_names:
+        for v in param['state_vars']:
+            ens_obj.subset_ds[ens]['bgd_'+v] = ens_obj.subset_ds[ens][v].copy()
 
     # Create 1D array of average heights AGL
-    z1d = ens_avg_z_1d(ens_obj)
+    z1d, zlvls = ens_avg_z_1d(ens_obj)
 
-    return ens_obj, z1d, param
+    return ens_obj, z1d, zlvls, param
 
 
 def run_cld_forward_operator_1ob(ens_obj, ob_sid, ob_idx, ens_name=['mem0001'], hofx_kw={}, verbose=False):
@@ -359,16 +400,16 @@ def compute_ens_incr_3D(ens_obj, field):
     """
 
     mem_names = ens_obj.mem_names
-    incr_sum = np.zeros(ens_obj.subset_ds[mem_names[0]][field].shape)
+    incr_sum = np.zeros(ens_obj.subset_ds[mem_names[0]][f"bgd_{field}"].shape)
 
     # Compute increment for each ensemble member
     for m in mem_names:
-        ens_obj.subset_ds[m][f"incr_{field}"] = ens_obj.subset_ds[m][field].copy()
-        ens_obj.subset_ds[m][f"incr_{field}"].values = ens_obj.subset_ds[m][f"ana_{field}"].values - ens_obj.subset_ds[m][field].values
+        ens_obj.subset_ds[m][f"incr_{field}"] = ens_obj.subset_ds[m][f"bgd_{field}"].copy()
+        ens_obj.subset_ds[m][f"incr_{field}"].values = ens_obj.subset_ds[m][f"ana_{field}"].values - ens_obj.subset_ds[m][f"bgd_{field}"].values
         incr_sum = incr_sum + ens_obj.subset_ds[m][f"incr_{field}"].values
     
     # Add average increment to first ensemble member
-    ens_obj.subset_ds[mem_names[0]][f"mean_incr_{field}"] = ens_obj.subset_ds[mem_names[0]][field].copy()
+    ens_obj.subset_ds[mem_names[0]][f"mean_incr_{field}"] = ens_obj.subset_ds[mem_names[0]][f"bgd_{field}"].copy()
     ens_obj.subset_ds[mem_names[0]][f"mean_incr_{field}"].values = incr_sum / len(mem_names)
 
     return ens_obj
@@ -481,21 +522,23 @@ def run_enkf_1ob(ens_obj, ob_sid, ob_idx, verbose=0):
         
     """
 
+    start_enkf = dt.datetime.now()
+
     # Apply cloud DA forward operator
     cld_amt, cld_z, hofx, cld_ob_coord = run_cld_forward_operator_1ob(ens_obj, ob_sid, ob_idx, 
                                                                       ens_name=ens_obj.mem_names,
                                                                       hofx_kw={'hgt_lim_kw':{'max_hgt':3500},
                                                                                'verbose':0},
                                                                       verbose=False)
-    if verbose > 0: print('Cloud ceilometer ob hgt =', cld_z)
-    if verbose > 0: print('Cloud ceilometer ob amt =', cld_amt)
-    if verbose > 0: print('Cloud ceilometer H(x) =', hofx)
-    if verbose > 0: print(f"Time to complete forward operator = {(dt.datetime.now() - start_loop).total_seconds()} s")
+    if verbose > 1: print('Cloud ceilometer ob hgt =', cld_z)
+    if verbose > 1: print('Cloud ceilometer ob amt =', cld_amt)
+    if verbose > 1: print('Cloud ceilometer H(x) =', hofx)
+    if verbose > 0: print(f"Time to complete forward operator = {(dt.datetime.now() - start_enkf).total_seconds()} s")
 
     # Compute localization
     if param['localization']['use']:
         start_local = dt.datetime.now()
-        if verbose > 0: print(f"computing localization with lh = {param['localization']['lh']}, lv = {param['localization']['lv']}")
+        if verbose > 1: print(f"computing localization with lh = {param['localization']['lh']}, lv = {param['localization']['lv']}")
         C_local = compute_localization_array(ens_obj, param, cld_ob_coord[0], cld_ob_coord[1], cld_ob_coord[2])
         if verbose > 0: print(f"Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
     else:
@@ -504,13 +547,58 @@ def run_enkf_1ob(ens_obj, ob_sid, ob_idx, verbose=0):
     # Run EnKF
     enkf_obj = enkf.enkf_1ob(ens_obj.state_matrix['data'], cld_amt, hofx, param['ob_var'], localize=C_local)
     enkf_obj.EnSRF()
-    if verbose > 0: print(f"Time to complete forward operator and EnSRF = {(dt.datetime.now() - start_loop).total_seconds()} s")
+    if verbose > 0: print(f"Time to complete forward operator and EnSRF = {(dt.datetime.now() - start_enkf).total_seconds()} s")
 
-    # Save output to ens_obj for easier plotting
-    ens_obj = add_inc_and_analysis_to_ens_obj(ens_obj, enkf_obj)
-    ens_obj = add_ens_mean_std_K_to_ens_obj(ens_obj, enkf_obj)
+    # Update ens_obj with the new analysis
+    xa_nd = unravel_state_matrix(enkf_obj.x_a, ens_obj)
+    for v in xa_nd.keys():
+        for ens in xa_nd[v].keys():
+            ens_obj.subset_ds[ens][v].values = xa_nd[v][ens]
+    ens_obj.state_matrix['data'] = enkf_obj.x_a
 
     return ens_obj, cld_ob_coord, cld_z
+
+
+def post_enkf(ens_obj, param):
+    """
+    Postprocess EnKF output
+
+    * Compute RH
+    * Create analysis (ana_) fields
+    * Compute ensemble statistics
+    * Compute analysis increments
+
+    Parameters
+    ----------
+    ens_obj : pyDA_utils.ensemble_utils.ensemble object
+        Ensemble output
+    param : dictionary
+        YAML inputs
+
+    Returns
+    -------
+    ens_obj : pyDA_utils.ensemble_utils.ensemble object
+        Ensemble output
+
+    """
+
+    # Save analysis fields
+    for ens in ens_obj.mem_names:
+        for v in param['state_vars']:
+            ens_obj.subset_ds[ens]['ana_'+v] = ens_obj.subset_ds[ens][v].copy()
+
+    # Compute RH
+    for p in ['bgd_', 'ana_']:
+        ens_obj = compute_RH(ens_obj, prefix=p)
+    
+    # Compute ensemble stats and analysis increment
+    param['state_vars'].append('RH_P0_L105_GLC0')
+    for v in param['state_vars']:
+        for p in ['bgd_', 'ana_']:
+            ens_obj = compute_ens_stats_3D(ens_obj, f"{p}{v}")
+        ens_obj = compute_ens_incr_3D(ens_obj, v)
+    
+    return ens_obj
 
 
 if __name__ == '__main__':
@@ -518,7 +606,7 @@ if __name__ == '__main__':
     start = dt.datetime.now()
 
     # Read and preprocess ensemble
-    ens_obj, ens_z1d, param = read_preprocess_ens(sys.argv[1])
+    ens_obj, ens_z1d, ens_zlvls, param = read_preprocess_ens(sys.argv[1])
     ens_obj_original = copy.deepcopy(ens_obj)
     param_original = copy.deepcopy(param)
 
@@ -532,82 +620,42 @@ if __name__ == '__main__':
     plt.savefig(f"{param['out_dir']}/obs_clouds.png")
     plt.close(fig)
 
-    # Loop over each observation
-    for ob_sid, ob_idx in zip(param['ob_sid'], param['ob_idx']):
+    # Loop over each experiment
+    for da_exp in param['ob_sel'].keys():
 
         start_loop = dt.datetime.now()
         print()
         print('-----------------------------------------------')
-        print(f"Starting single-ob test for {ob_sid} {ob_idx}")
+        print(f"Starting EnKF experiment {da_exp}")
 
         # Run EnKF
-        ens_obj, cld_ob_coord, cld_z = run_enkf_1ob(ens_obj, ob_sid, ob_idx, verbose=1)
+        ob_coord_all = []
+        for ob_sid in param['ob_sel'][da_exp].keys():
+            for ob_idx in param['ob_sel'][da_exp][ob_sid]:
+                print(f"Assimilating {ob_sid} {ob_idx}")
+                ens_obj, cld_ob_coord, cld_z = run_enkf_1ob(ens_obj, ob_sid, ob_idx, verbose=2)
+                ob_coord_all.append(cld_ob_coord)
+        ob_coord_all = np.array(ob_coord_all)
 
-        # Compute RH as well as ensemble stats for RH
-        for p in ['', 'ana_']:
-            ens_obj = compute_RH(ens_obj, prefix=p)
-            ens_obj = compute_ens_stats_3D(ens_obj, f"{p}RH_P0_L105_GLC0")
-        ens_obj = compute_ens_incr_3D(ens_obj, "RH_P0_L105_GLC0")
-        param['state_vars'].append('RH_P0_L105_GLC0')
+        # Post-EnKF
+        ens_obj = post_enkf(ens_obj, param)
 
-        # Prep for making plots
+        # Make plots
         print()
         print('Plotting section')
-        save_dir = f"{param['out_dir']}/{ob_sid}_{ob_idx}"
+        save_dir = f"{param['out_dir']}/{da_exp}"
         os.system(f"mkdir {save_dir}")
-
-        # Make Skew-T postage stamp plots
-        if param['plot_postage_config']['skewt']:
-            print('plotting Skew-T diagram postage stamps...')
-            fig = ens_viz.plot_skewt_postage_stamp(ens_obj, param, cld_ob_coord[2], cld_ob_coord[1])
-            plt.savefig(f"{save_dir}/postage_stamp_skewt_{param['save_tag']}.pdf")  # Save as a PDF to make it easier to zoom in
-            plt.close(fig)
-
-        # Plot ensemble mean and standard deviation
-        print('Making ensemble statistic plots')
-        for field in param['ens_stats_plots']:
-            if field not in ens_obj.subset_ds[ens_obj.mem_names[0]]:
-                print(f'field {field} is missing. Skipping.')
-                continue
-            print(f'plotting {field}...')
-            fig = ens_viz.plot_horiz_slices(ens_obj.subset_ds[ens_obj.mem_names[0]], 
-                                            field,
-                                            ens_obj,
-                                            param,
-                                            ob={'plot':True,
-                                                'x':cld_ob_coord[1], 
-                                                'y':cld_ob_coord[2], 
-                                                'kwargs':{'marker':'*', 'color':'k'}},
-                                            save_dir=save_dir)
-            plt.close(fig)
-
-        # Make postage stamp plots
-        print('Making postage stamp plots')
-        klvl = np.argmin(np.abs(ens_z1d - cld_z))
-        print(f"postage stamp klvl = {klvl} ({ens_z1d[klvl]} m AGL)")
-        for field in param['postage_stamp_plots'].keys():
-            if field not in ens_obj.subset_ds[ens_obj.mem_names[0]]:
-                print(f'field {field} is missing. Skipping.')
-                continue
-            print(f'plotting {field}...')
-            fig = ens_viz.plot_horiz_postage_stamp(ens_obj, param, upp_field=field, 
-                                                   klvl=klvl,
-                                                   ob={'plot':True,
-                                                       'x':cld_ob_coord[1], 
-                                                       'y':cld_ob_coord[2], 
-                                                       'kwargs':{'marker':'*', 'color':'k'}},
-                                                   save_dir=save_dir,
-                                                   debug=0)
-            plt.close(fig)
+        ens_viz.plot_driver(ens_obj, param, save_dir, ob_coord_all, ens_zlvls, ens_z1d, verbose=1)
         
         # Clean up
-        print(f'total time for {ob_sid} {ob_idx} (forward operator, EnSRF, and plots) = {(dt.datetime.now() - start_loop).total_seconds()} s')
+        print(f'total time for {da_exp} (forward operator, EnSRF, and plots) = {(dt.datetime.now() - start_loop).total_seconds()} s')
         ens_obj = copy.deepcopy(ens_obj_original)
         param = copy.deepcopy(param_original)
 
+    print()
     print(f'total elapsed time = {(dt.datetime.now() - start).total_seconds()} s')
 
 
 """
-End single_ceilometer_ob_enkf.py
+End ceilometer_ob_enkf.py
 """

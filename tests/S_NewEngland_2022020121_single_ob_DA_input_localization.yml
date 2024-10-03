@@ -65,17 +65,25 @@ state_vars:
   - 'TCDC_P0_L105_GLC0'
 
 # Tag to add to output files and output file directory
-save_tag: 'S_NewEngland_2022020121_single_ob_test'
+save_tag: 'S_NewEngland_2022020121_EnKF_test'
 out_dir: '/lfs5/BMC/wrfruc/murdzek/src/direct_ceilometer_DA/tests/test_localize_out' 
 
 # Misc options
 do_bec: False
 
 # Options for single observation test
-ob_sid:
-  - 'KHFD'
-ob_idx: 
-  - 2
+# In ob_sel, first key is test name, second key is the station ID, and the values are the ob indices
+ob_sel:
+  single_ob:
+    KHFD:
+      - 2
+  triple_ob:
+    KHFD:
+      - 2
+    KCEF:
+      - 2
+    KPYM:
+      - 4
 ob_var: 156.25
 
 # Localization options
@@ -96,7 +104,7 @@ localization:
 #   - A list of values
 #   - The word "range", followed by the start, stop, and step
 postage_stamp_plots:
-  RH_P0_L105_GLC0: &RH_postage
+  bgd_RH_P0_L105_GLC0: &RH_postage
     title: 'Relative Humidity'
     save_tag: 'RH_bgd'
     cntf_kw:
@@ -107,7 +115,13 @@ postage_stamp_plots:
           - -5
           - 105.1 
           - 5
-  TMP_P0_L105_GLC0:
+    ob_plot: &ob_plot 
+      use: True
+      kw:
+        marker: '*'
+        color: 'k'
+        linewidth: 0
+  bgd_TMP_P0_L105_GLC0:
     title: 'Temperature'
     save_tag: 'T_bgd'
     cntf_kw:
@@ -118,7 +132,9 @@ postage_stamp_plots:
           - 250
           - 270 
           - 1
-  SPFH_P0_L105_GLC0:
+    ob_plot:
+      <<: *ob_plot
+  bgd_SPFH_P0_L105_GLC0:
     title: 'Specific Humidity'
     save_tag: 'Q_bgd'
     cntf_kw:
@@ -129,7 +145,9 @@ postage_stamp_plots:
           - 0
           - 0.005 
           - 0.00024
-  TCDC_P0_L105_GLC0: 
+    ob_plot:
+      <<: *ob_plot
+  bgd_TCDC_P0_L105_GLC0: &TCDC_postage
     title: 'Cloud Cover'
     save_tag: 'cloud_cover_bgd'
     cntf_kw:
@@ -140,6 +158,8 @@ postage_stamp_plots:
           - 0
           - 100.1 
           - 5
+    ob_plot:
+      <<: *ob_plot
   incr_RH_P0_L105_GLC0:
     title: 'Relative Humidity'
     save_tag: 'RH_incr'
@@ -151,9 +171,14 @@ postage_stamp_plots:
           - -23
           - 23.1 
           - 2
+    ob_plot:
+      <<: *ob_plot
   ana_RH_P0_L105_GLC0:
     <<: *RH_postage
     save_tag: 'RH_ana'
+  ana_TCDC_P0_L105_GLC0:
+    <<: *TCDC_postage
+    save_tag: 'cloud_cover_ana'
 plot_postage_config:
   nrows: 5
   ncols: 6
@@ -164,7 +189,7 @@ plot_postage_config:
 
 # Ensemble statistic plotting options
 ens_stats_plots:
-  mean_RH_P0_L105_GLC0: &RH_stats
+  mean_bgd_RH_P0_L105_GLC0: &RH_stats
     cntf_kw:
       cmap: 'RH_cmap'
       extend: 'both'
@@ -173,6 +198,8 @@ ens_stats_plots:
           - -5
           - 105.1 
           - 5
+    ob_plot:
+      <<: *ob_plot
   mean_incr_RH_P0_L105_GLC0:
     cntf_kw:
       cmap: 'bwr'
@@ -182,6 +209,8 @@ ens_stats_plots:
           - -23
           - 23.1
           - 2
+    ob_plot:
+      <<: *ob_plot
   mean_ana_RH_P0_L105_GLC0:
     <<: *RH_stats
 plot_stat_config:
