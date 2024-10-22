@@ -496,7 +496,7 @@ def add_ens_mean_std_K_to_ens_obj(ens_obj, enkf_obj):
     return ens_obj
 
 
-def run_enkf_1ob(ens_obj, ob_sid, ob_idx, verbose=0):
+def run_enkf_1ob(ens_obj, ens_obj_hofx, ob_sid, ob_idx, verbose=0):
     """
     Run EnKF for a single observation
 
@@ -504,6 +504,8 @@ def run_enkf_1ob(ens_obj, ob_sid, ob_idx, verbose=0):
     ----------
     ens_obj : pyDA_utils.ensemble_utils.ensemble object
         Ensemble output
+    ens_obj_hofx : pyDA_utils.ensemble_utils.ensemble object
+        Ensemble output used to compute H(x)
     ob_sid : string
         Observation SID
     ob_idx : integer
@@ -525,7 +527,7 @@ def run_enkf_1ob(ens_obj, ob_sid, ob_idx, verbose=0):
     start_enkf = dt.datetime.now()
 
     # Apply cloud DA forward operator
-    cld_amt, cld_z, hofx, cld_ob_coord = run_cld_forward_operator_1ob(ens_obj, ob_sid, ob_idx, 
+    cld_amt, cld_z, hofx, cld_ob_coord = run_cld_forward_operator_1ob(ens_obj_hofx, ob_sid, ob_idx, 
                                                                       ens_name=ens_obj.mem_names,
                                                                       hofx_kw={'hgt_lim_kw':{'max_hgt':3500},
                                                                                'verbose':0},
@@ -633,7 +635,10 @@ if __name__ == '__main__':
         for ob_sid in param['ob_sel'][da_exp].keys():
             for ob_idx in param['ob_sel'][da_exp][ob_sid]:
                 print(f"Assimilating {ob_sid} {ob_idx}")
-                ens_obj, cld_ob_coord, cld_z = run_enkf_1ob(ens_obj, ob_sid, ob_idx, verbose=2)
+                if param['redo_hofx']:
+                    ens_obj, cld_ob_coord, cld_z = run_enkf_1ob(ens_obj, ens_obj, ob_sid, ob_idx, verbose=2)
+                else:
+                    ens_obj, cld_ob_coord, cld_z = run_enkf_1ob(ens_obj, ens_obj_original, ob_sid, ob_idx, verbose=2)
                 ob_coord_all.append(cld_ob_coord)
         ob_coord_all = np.array(ob_coord_all)
 

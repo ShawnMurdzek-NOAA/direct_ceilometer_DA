@@ -2,7 +2,7 @@
 #--------------------------------------------
 
 # UPP output for each ensemble member
-str_format: '/mnt/lfs5/BMC/wrfruc/murdzek/RRFS_Ens_Cloud_DA/Feb2022_retro/Ens_GDAS_SDLVDL_noGF_cloud1/v0.6.2/prod/rrfs_conus_3km_ensda.20220201/20/mem{num:04d}/rrfs.t20z.{lev}.f001.conus_3km.grib2'
+str_format: '/gpfs/f6/pmp/scratch/Shawn.S.Murdzek/RRFS_Ens_Cloud_DA/Feb2022_retro/Ens_GDAS_SDLVDL_noGF_cloud1/v0.6.2/prod/rrfs_conus_3km_ensda.20220201/20/mem{num:04d}/rrfs.t20z.{lev}.f001.conus_3km.grib2'
 prslev_vars:
   - 'HGT_P0_L215_GLC0'
   - 'CEIL_P0_L215_GLC0'
@@ -10,11 +10,11 @@ prslev_vars:
 nmem: 3
 
 # Option to save output to a netCDF file
-subset_ens_nc: '/mnt/lfs5/BMC/wrfruc/murdzek/src/direct_ceilometer_DA/tests/data/test_data.nc'
+subset_ens_nc: '/ncrc/home2/Shawn.S.Murdzek/src/direct_ceilometer_DA/tests/data/test_data.nc'
 save_to_nc: True
 
 # BUFR parameters
-bufr_fname: '/lfs5/BMC/wrfruc/murdzek/real_obs/decoded_bufr_for_cloudDA/202202012100.rap.prepbufr.csv'
+bufr_fname: '/gpfs/f6/pmp/scratch/Shawn.S.Murdzek/real_obs/decoded_bufr_for_cloudDA/202202012100.rap.prepbufr.csv'
 
 # Subset domain
 min_lon: -73.0
@@ -66,7 +66,7 @@ state_vars:
 
 # Tag to add to output files and output file directory
 save_tag: 'S_NewEngland_2022020121_EnKF_test'
-out_dir: '/lfs5/BMC/wrfruc/murdzek/src/direct_ceilometer_DA/tests/test_localize_out' 
+out_dir: '/ncrc/home2/Shawn.S.Murdzek/src/direct_ceilometer_DA/tests/test_out' 
 
 # Misc options
 do_bec: False
@@ -86,10 +86,13 @@ ob_sel:
       - 4
 ob_var: 156.25
 
+# Option to re-run forward operator after each observation is assimilated
+redo_hofx: True
+
 # Localization options
 # lh is in km, lv is in model vertical levels
 localization:
-  use: True
+  use: False
   lh: 50
   lv: 4
 
