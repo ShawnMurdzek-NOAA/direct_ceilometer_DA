@@ -314,7 +314,7 @@ def plot_driver(ens_obj, param, save_dir, ob_coord, ens_zlvls, ens_z1d, verbose=
 
     # Make Skew-T postage stamp plots for the first observation location
     if param['plot_postage_config']['skewt']:
-        if verbose > 0: print('plotting Skew-T diagram postage stamps...')
+        if verbose > 0: print('Making Skew-T diagram postage stamps...')
         fig = plot_skewt_postage_stamp(ens_obj, param, ob_coord[0, 2], ob_coord[0, 1])
         plt.savefig(f"{save_dir}/postage_stamp_skewt_{param['save_tag']}.pdf")  # Save as a PDF to make it easier to zoom in
         plt.close(fig)
@@ -323,9 +323,12 @@ def plot_driver(ens_obj, param, save_dir, ob_coord, ens_zlvls, ens_z1d, verbose=
     if verbose > 0: print('Making ensemble statistic plots')
     for field in param['ens_stats_plots']:
         if field not in ens_obj.subset_ds[ens_obj.mem_names[0]]:
-            if verbose > 0: print(f'field {field} is missing. Skipping.')
+            if verbose > 0: print(f'  field {field} is missing. Skipping.')
             continue
-        if verbose > 0: print(f'plotting {field}...')
+        if ('bgd' in field) and (param['plot_stat_config']['plot_bgd_once']):
+            if verbose > 0: print(f'  skipping background field {field}')
+            continue
+        if verbose > 0: print(f'  plotting {field}...')
         fig = plot_horiz_slices(ens_obj.subset_ds[ens_obj.mem_names[0]], 
                                 field,
                                 ens_obj,
@@ -340,9 +343,9 @@ def plot_driver(ens_obj, param, save_dir, ob_coord, ens_zlvls, ens_z1d, verbose=
     if verbose > 0: print(f"postage stamp klvl = {klvl} ({ens_z1d[klvl]} m AGL)")
     for field in param['postage_stamp_plots'].keys():
         if field not in ens_obj.subset_ds[ens_obj.mem_names[0]]:
-            print(f'field {field} is missing. Skipping.')
+            print(f'  field {field} is missing. Skipping.')
             continue
-        if verbose > 0: print(f'plotting {field}...')
+        if verbose > 0: print(f'  plotting {field}...')
         fig = plot_horiz_postage_stamp(ens_obj, param, upp_field=field, 
                                        klvl=klvl,
                                        ob_coord=ob_coord[:, 1:],

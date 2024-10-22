@@ -561,7 +561,7 @@ def run_enkf_1ob(ens_obj, ens_obj_hofx, ob_sid, ob_idx, verbose=0):
     return ens_obj, cld_ob_coord, cld_z
 
 
-def post_enkf(ens_obj, param):
+def post_enkf(ens_obj, param, DA=True):
     """
     Postprocess EnKF output
 
@@ -576,6 +576,8 @@ def post_enkf(ens_obj, param):
         Ensemble output
     param : dictionary
         YAML inputs
+    DA : boolean, optional
+        Was DA actually performed?
 
     Returns
     -------
@@ -585,22 +587,59 @@ def post_enkf(ens_obj, param):
     """
 
     # Save analysis fields
-    for ens in ens_obj.mem_names:
-        for v in param['state_vars']:
-            ens_obj.subset_ds[ens]['ana_'+v] = ens_obj.subset_ds[ens][v].copy()
+    prefixes = ['bgd_']
+    if DA:
+        for ens in ens_obj.mem_names:
+            for v in param['state_vars']:
+                ens_obj.subset_ds[ens]['ana_'+v] = ens_obj.subset_ds[ens][v].copy()
+        prefixes.append('ana_')
 
     # Compute RH
-    for p in ['bgd_', 'ana_']:
+    for p in prefixes:
         ens_obj = compute_RH(ens_obj, prefix=p)
     
     # Compute ensemble stats and analysis increment
     param['state_vars'].append('RH_P0_L105_GLC0')
     for v in param['state_vars']:
-        for p in ['bgd_', 'ana_']:
+        for p in prefixes:
             ens_obj = compute_ens_stats_3D(ens_obj, f"{p}{v}")
-        ens_obj = compute_ens_incr_3D(ens_obj, v)
+        if DA:
+            ens_obj = compute_ens_incr_3D(ens_obj, v)
     
     return ens_obj
+
+
+def only_retain_bgd_stats(param):
+    """
+    Only retain background stats plots in param
+
+    Parameters
+    ----------
+    param : dictionary
+        Input parameters
+    
+    Returns
+    -------
+    param : dictionary
+        Input parameters, but only with background stats plots included
+
+    """
+
+    # Turn off all other plots
+    param['postage_stamp_plots'] = {}
+    param['plot_postage_config']['skewt'] = False
+
+    # Only retain bgd ensemble stat plots
+    keep_dict = {}
+    for key in param['ens_stats_plots']:
+        if 'bgd' in key:
+            keep_dict[key] = param['ens_stats_plots'][key]
+    param['ens_stats_plots'] = keep_dict
+
+    # Turn off option to ignore bgd ensemble stat plots
+    param['plot_stat_config']['plot_bgd_once'] = False
+
+    return param
 
 
 if __name__ == '__main__':
@@ -625,6 +664,10 @@ if __name__ == '__main__':
     # Loop over each experiment
     for da_exp in param['ob_sel'].keys():
 
+        # Start with fresh versions of param and ens_obj
+        ens_obj = copy.deepcopy(ens_obj_original)
+        param = copy.deepcopy(param_original)
+
         start_loop = dt.datetime.now()
         print()
         print('-----------------------------------------------')
@@ -634,16 +677,24 @@ if __name__ == '__main__':
         ob_coord_all = []
         for ob_sid in param['ob_sel'][da_exp].keys():
             for ob_idx in param['ob_sel'][da_exp][ob_sid]:
-                print(f"Assimilating {ob_sid} {ob_idx}")
-                if param['redo_hofx']:
-                    ens_obj, cld_ob_coord, cld_z = run_enkf_1ob(ens_obj, ens_obj, ob_sid, ob_idx, verbose=2)
+                if param['perform_da']:
+                    print(f"Assimilating {ob_sid} {ob_idx}")
+                    if param['redo_hofx']:
+                        ens_obj, cld_ob_coord, cld_z = run_enkf_1ob(ens_obj, ens_obj, ob_sid, ob_idx, verbose=2)
+                    else:
+                        ens_obj, cld_ob_coord, cld_z = run_enkf_1ob(ens_obj, ens_obj_original, ob_sid, ob_idx, verbose=2)
                 else:
-                    ens_obj, cld_ob_coord, cld_z = run_enkf_1ob(ens_obj, ens_obj_original, ob_sid, ob_idx, verbose=2)
+                    print(f"Skipping DA... obtaining coordinates for {ob_sid} {ob_idx}")
+                    _, _, _, cld_ob_coord = run_cld_forward_operator_1ob(ens_obj, ob_sid, ob_idx, 
+                                                                         ens_name=ens_obj.mem_names,
+                                                                         hofx_kw={'hgt_lim_kw':{'max_hgt':3500},
+                                                                                  'verbose':0},
+                                                                         verbose=False)
                 ob_coord_all.append(cld_ob_coord)
         ob_coord_all = np.array(ob_coord_all)
 
-        # Post-EnKF
-        ens_obj = post_enkf(ens_obj, param)
+        # Post EnKF
+        ens_obj = post_enkf(ens_obj, param, DA=param['perform_da'])
 
         # Make plots
         print()
@@ -652,13 +703,19 @@ if __name__ == '__main__':
         os.system(f"mkdir {save_dir}")
         ens_viz.plot_driver(ens_obj, param, save_dir, ob_coord_all, ens_zlvls, ens_z1d, verbose=1)
         
-        # Clean up
-        print(f'total time for {da_exp} (forward operator, EnSRF, and plots) = {(dt.datetime.now() - start_loop).total_seconds()} s')
-        ens_obj = copy.deepcopy(ens_obj_original)
-        param = copy.deepcopy(param_original)
+        print(f'total time for {da_exp} = {(dt.datetime.now() - start_loop).total_seconds()} s')
 
     print()
     print(f'total elapsed time = {(dt.datetime.now() - start).total_seconds()} s')
+
+# Plot background ensemble stat fields if only plotting once
+if param['plot_stat_config']['plot_bgd_once']:
+    param = only_retain_bgd_stats(param)
+    ob_coord_all = np.array([[0, 0, 0]])
+    print()
+    print('Final plots: Background ensemble stats')
+    save_dir = f"{param['out_dir']}"
+    ens_viz.plot_driver(ens_obj, param, save_dir, ob_coord_all, ens_zlvls, ens_z1d, verbose=1)
 
 
 """
