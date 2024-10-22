@@ -658,7 +658,7 @@ if __name__ == '__main__':
     fig = ens_viz.plot_cld_obs(ens_obj, param, bins=bins, 
                                nrows=param['plot_stat_config']['nrows'], ncols=param['plot_stat_config']['ncols'],
                                scatter_kw={'vmin':0, 'vmax':100, 'cmap':'plasma_r', 's':32, 'edgecolors':'k', 'linewidths':0.5})
-    plt.savefig(f"{param['out_dir']}/obs_clouds.png")
+    plt.savefig(f"{param['out_dir']}/obs_clouds.png", dpi=500)
     plt.close(fig)
 
     # Loop over each experiment

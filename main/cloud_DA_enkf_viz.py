@@ -251,9 +251,17 @@ def plot_cld_obs(ens_obj, param, bins=np.arange(0, 2001, 250), nrows=2, ncols=4,
     cld_ob_df = cfo.remove_missing_cld_ob(bufr_df)
     cld_hofx = cfo.ceilometer_hofx_driver(cld_ob_df, ens_obj.subset_ds[ens_obj.mem_names[0]], **hofx_kw)
 
-    # Make plot
+    # Make figure
     fig = plt.figure(figsize=figsize)
     axes = []
+
+    # Plot station IDs in first subplot
+    axes.append(fig.add_subplot(nrows, ncols, 1, projection=ccrs.LambertConformal()))
+    for i in range(len(cld_hofx.data['HOCB'])):
+        axes[-1].text(cld_hofx.data['lon'][i], cld_hofx.data['lat'][i], cld_hofx.data['SID'][i][1:], 
+                      size=5, horizontalalignment='center', transform=ccrs.PlateCarree())
+
+    # Plot cloud amounts
     for i in range(len(bins) - 1):
 
         # Extract obs within this height bin
@@ -267,17 +275,20 @@ def plot_cld_obs(ens_obj, param, bins=np.arange(0, 2001, 250), nrows=2, ncols=4,
                 obs['ob_cld_amt'].append(cld_hofx.data['ob_cld_amt'][j][k])
 
         # Make plot
-        axes.append(fig.add_subplot(nrows, ncols, i+1, projection=ccrs.LambertConformal()))
+        axes.append(fig.add_subplot(nrows, ncols, i+2, projection=ccrs.LambertConformal()))
         cax = axes[-1].scatter(obs['lon'], obs['lat'], c=obs['ob_cld_amt'], transform=ccrs.PlateCarree(),
                                **scatter_kw)
-        axes[-1].set_extent([param['min_lon'], param['max_lon'], param['min_lat'], param['max_lat']])
-        axes[-1].coastlines('50m', edgecolor='gray', linewidth=0.25)
-        borders = cfeature.NaturalEarthFeature(category='cultural',
-                                               scale='50m',
-                                               facecolor='none',
-                                               name='admin_1_states_provinces')
-        axes[-1].add_feature(borders, linewidth=0.25, edgecolor='gray')
         axes[-1].set_title(f"[{bins[i]:.0f}, {bins[i+1]:.0f})", size=14)
+    
+    # Format subplots
+    borders = cfeature.NaturalEarthFeature(category='cultural',
+                                           scale='50m',
+                                           facecolor='none',
+                                           name='admin_1_states_provinces')
+    for ax in axes:
+        ax.set_extent([param['min_lon'], param['max_lon'], param['min_lat'], param['max_lat']])
+        ax.coastlines('50m', edgecolor='gray', linewidth=0.25)
+        ax.add_feature(borders, linewidth=0.25, edgecolor='gray')
     
     cbar = plt.colorbar(cax, ax=axes, orientation='vertical')
     cbar.set_label('observed cloud percentage', size=14)
