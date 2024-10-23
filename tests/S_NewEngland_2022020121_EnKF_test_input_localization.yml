@@ -88,10 +88,17 @@ ob_sel:
       - 2
     KPYM:
       - 4
+  #all_obs: entire_file
 ob_var: 156.25
 
 # Option to re-run forward operator after each observation is assimilated
 redo_hofx: True
+
+# Forward operator keyword arguments passed to cfo.ceilometer_hofx_driver
+hofx_kw:
+  hgt_lim_kw:
+    max_hgt: 3500
+  verbose: 0
 
 # Localization options
 # lh is in km, lv is in model vertical levels

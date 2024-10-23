@@ -215,7 +215,7 @@ def plot_skewt_postage_stamp(ens_obj, param, lat, lon):
     return fig
 
 
-def plot_cld_obs(ens_obj, param, bins=np.arange(0, 2001, 250), nrows=2, ncols=4, figsize=(10, 10), 
+def plot_cld_obs(ens_obj, cld_ob_df, param, bins=np.arange(0, 2001, 250), nrows=2, ncols=4, figsize=(10, 10), 
                  hofx_kw={}, scatter_kw={}):
     """
     Plot ceilometer obs in horizontal slices for various vertical bins
@@ -224,6 +224,8 @@ def plot_cld_obs(ens_obj, param, bins=np.arange(0, 2001, 250), nrows=2, ncols=4,
     ----------
     ens_obj : pyDA_utils.ensemble_utils.ensemble
         Ensemble object
+    cld_ob_df : pd.DataFrame
+        Ceilometer observations used in the forward operator
     param : dictionary
         YAML inputs
     bins : array, optional
@@ -246,9 +248,7 @@ def plot_cld_obs(ens_obj, param, bins=np.arange(0, 2001, 250), nrows=2, ncols=4,
 
     """
 
-    # Extract cloud obs
-    bufr_df = ens_obj._subset_bufr(['ADPSFC', 'MSONET'], DHR=np.nan)
-    cld_ob_df = cfo.remove_missing_cld_ob(bufr_df)
+    # Run forward operator to add "clear" obs
     cld_hofx = cfo.ceilometer_hofx_driver(cld_ob_df, ens_obj.subset_ds[ens_obj.mem_names[0]], **hofx_kw)
 
     # Make figure
