@@ -588,7 +588,7 @@ def run_enkf(ens_obj, ob_df, param, verbose=0):
     cld_hofx_ref = run_cld_forward_operator(ens_obj, ob_df, ens_name=[m1], hofx_kw=param['hofx_kw'])
 
     # Apply cloud DA forward operator if only needed once
-    if not param['redo_hofx']:
+    if (not param['redo_hofx']) or (not param['perform_da']):
         cld_hofx = run_cld_forward_operator(ens_obj, ob_df, ens_name=ens_obj.mem_names, hofx_kw=param['hofx_kw'])
         if verbose > 0: print(f"Time to complete forward operator for all members and obs = {(dt.datetime.now() - start_enkf).total_seconds()} s")
 
@@ -597,7 +597,7 @@ def run_enkf(ens_obj, ob_df, param, verbose=0):
         ob_sids = cld_hofx_ref[m1].data['SID']
     else:
         ob_sids = list(param['ob_sel'][da_exp].keys())
-    for i, s in enumerate(ob_sids):
+    for s in ob_sids:
         if param['ob_sel'][da_exp] == 'entire_file':
             ob_idx = list(range(len(cld_hofx_ref[m1].data['HOCB'][i])))
         else:
@@ -612,7 +612,7 @@ def run_enkf(ens_obj, ob_df, param, verbose=0):
                 cld_hofx = run_cld_forward_operator(ens_obj, dum, ens_name=ens_obj.mem_names, hofx_kw=param['hofx_kw'])
                 idx1 = 0
             else:
-                idx1 = i
+                idx1 = np.where(np.array(cld_hofx[m1].data['SID']) == s)[0][0]
 
             # Extract cloud amount, H(x), and location
             hofx = np.zeros(len(cld_hofx))
