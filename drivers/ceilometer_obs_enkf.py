@@ -597,7 +597,7 @@ def run_enkf(ens_obj, ob_df, param, verbose=0):
         ob_sids = cld_hofx_ref[m1].data['SID']
     else:
         ob_sids = list(param['ob_sel'][da_exp].keys())
-    for s in ob_sids:
+    for i, s in enumerate(ob_sids):
         if param['ob_sel'][da_exp] == 'entire_file':
             ob_idx = list(range(len(cld_hofx_ref[m1].data['HOCB'][i])))
         else:
