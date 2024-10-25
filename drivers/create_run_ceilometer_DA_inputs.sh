@@ -84,6 +84,7 @@ for s in ${state[@]}; do
         sed -i "s={OBVAR}=${o}=" ${tmp_fname}
 
         out_dir="state_${tag_state}_lv${tag_lv}_lh${tag_lh}_obvar${o}_RedoHofX_${tag_hofx}"
+        sed -i "s={OUTDIR}=${out_dir}=" ${tmp_fname}
         mkdir ${out_dir}
         mv ${tmp_fname} ${out_dir}/${final_yml}
         cp ${run_script} ${out_dir}
