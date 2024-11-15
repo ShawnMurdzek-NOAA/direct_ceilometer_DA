@@ -21,6 +21,7 @@ import yaml
 import probing_rrfs_ensemble as pre
 import direct_ceilometer_DA.main.cloud_DA_forward_operator as cfo
 import direct_ceilometer_DA.main.cloud_DA_enkf_viz as ens_viz
+import direct_ceilometer_DA.main.cloud_DA_enkf_postprocess as ens_post
 from pyDA_utils import enkf
 import pyDA_utils.ensemble_utils as eu
 from pyDA_utils import bufr
@@ -365,116 +366,6 @@ def unravel_state_matrix(x, ens_obj, ens_dim=True):
     return output
 
 
-def compute_RH(ens_obj, prefix=''):
-    """
-    Compute RH for the ensemble subset spatial domain
-
-    Parameters
-    ----------
-    ens_obj : pyDA_utils.ensemble_utils.ensemble object
-        Ensemble output
-    prefix : string, optional
-        RH field is written to "{prefix}RH_P0_L105_GLC0" using "PRES_P0_L105_GLC0", 
-        "{prefix}TMP_P0_L105_GLC0", and "{prefix}SPFH_P0_L105_GLC0"
-    
-    Returns
-    -------
-    ens_obj : pyDA_utils.ensemble_utils.ensemble object
-        Ensemble output with the added RH fields
-
-    """
-
-    for mem in ens_obj.mem_names:
-        ens_obj.subset_ds[mem][f"{prefix}RH_P0_L105_GLC0"] = ens_obj.subset_ds[mem]['SPFH_P0_L105_GLC0'].copy()
-        p = ens_obj.subset_ds[mem]["PRES_P0_L105_GLC0"].values * units.Pa
-        T = ens_obj.subset_ds[mem][f"{prefix}TMP_P0_L105_GLC0"].values * units.K
-        Q = ens_obj.subset_ds[mem][f"{prefix}SPFH_P0_L105_GLC0"].values * units.kg / units.kg
-        ens_obj.subset_ds[mem][f"{prefix}RH_P0_L105_GLC0"].values = mc.relative_humidity_from_specific_humidity(p, T, Q).magnitude * 100
-        ens_obj.subset_ds[mem][f"{prefix}RH_P0_L105_GLC0"].attrs['long_name'] = 'relative humidity'
-        ens_obj.subset_ds[mem][f"{prefix}RH_P0_L105_GLC0"].attrs['units'] = '%'
-
-    return ens_obj
-
-
-def compute_ens_stats_3D(ens_obj, field, stat_fct={'mean_':np.mean, 'std_': np.std}):
-    """
-    Compute various ensemble stats for a 3D field that is not part of the state vector
-
-    Parameters
-    ----------
-    ens_obj : pyDA_utils.ensemble_utils.ensemble object
-        Ensemble output
-    field : string
-        Field from ens_obj.subset_ds[m] to compute statistics for
-    stat_fct : dictionary, optional
-        Statistics to compute. Key is the prefix added to the resulting field and the value is the 
-        function
-    
-    Returns
-    -------
-    ens_obj : pyDA_utils.ensemble_utils.ensemble object
-        Ensemble output with statistics for the desired field added to the first ensemble member
-
-    Notes
-    -----
-    Output is saved to the first ensemble member
-
-    """
-
-    mem_names = ens_obj.mem_names
-    shape = ens_obj.subset_ds[mem_names[0]][field].shape
-    full_array = np.zeros([shape[0], shape[1], shape[2], len(mem_names)])
-
-    # Extract the desired field from each ensemble member
-    for i, m in enumerate(mem_names):
-        full_array[:, :, :, i] = ens_obj.subset_ds[m][field].values
-    
-    # Compute stats
-    for f in stat_fct.keys():
-        ens_obj.subset_ds[mem_names[0]][f"{f}{field}"] = ens_obj.subset_ds[mem_names[0]][field].copy()
-        ens_obj.subset_ds[mem_names[0]][f"{f}{field}"].values = stat_fct[f](full_array, axis=3)
-
-    return ens_obj
-
-
-def compute_ens_incr_3D(ens_obj, field):
-    """
-    Compute analysis increments for the desired field
-
-    Parameters
-    ----------
-    ens_obj : pyDA_utils.ensemble_utils.ensemble object
-        Ensemble output
-    field : string
-        Field from ens_obj.subset_ds[m] to compute statistics for
-    
-    Returns
-    -------
-    ens_obj : pyDA_utils.ensemble_utils.ensemble object
-        Ensemble output with analysis increments (using the prefix "incr_")
-
-    Notes
-    -----
-    The mean analysis increment is saved to the first ensemble member with the prefix "mean_incr_"
-
-    """
-
-    mem_names = ens_obj.mem_names
-    incr_sum = np.zeros(ens_obj.subset_ds[mem_names[0]][f"bgd_{field}"].shape)
-
-    # Compute increment for each ensemble member
-    for m in mem_names:
-        ens_obj.subset_ds[m][f"incr_{field}"] = ens_obj.subset_ds[m][f"bgd_{field}"].copy()
-        ens_obj.subset_ds[m][f"incr_{field}"].values = ens_obj.subset_ds[m][f"ana_{field}"].values - ens_obj.subset_ds[m][f"bgd_{field}"].values
-        incr_sum = incr_sum + ens_obj.subset_ds[m][f"incr_{field}"].values
-    
-    # Add average increment to first ensemble member
-    ens_obj.subset_ds[mem_names[0]][f"mean_incr_{field}"] = ens_obj.subset_ds[mem_names[0]][f"bgd_{field}"].copy()
-    ens_obj.subset_ds[mem_names[0]][f"mean_incr_{field}"].values = incr_sum / len(mem_names)
-
-    return ens_obj
-
-
 def add_inc_and_analysis_to_ens_obj(ens_obj, enkf_obj):
     """
     Add the analysis increment and analysis fields to ens_obj for easier plotting
@@ -654,54 +545,6 @@ def run_enkf(ens_obj, ob_df, param, verbose=0):
     return ens_obj, np.array(cld_ob_coord)
 
 
-def post_enkf(ens_obj, param, DA=True):
-    """
-    Postprocess EnKF output
-
-    * Compute RH
-    * Create analysis (ana_) fields
-    * Compute ensemble statistics
-    * Compute analysis increments
-
-    Parameters
-    ----------
-    ens_obj : pyDA_utils.ensemble_utils.ensemble object
-        Ensemble output
-    param : dictionary
-        YAML inputs
-    DA : boolean, optional
-        Was DA actually performed?
-
-    Returns
-    -------
-    ens_obj : pyDA_utils.ensemble_utils.ensemble object
-        Ensemble output
-
-    """
-
-    # Save analysis fields
-    prefixes = ['bgd_']
-    if DA:
-        for ens in ens_obj.mem_names:
-            for v in param['state_vars']:
-                ens_obj.subset_ds[ens]['ana_'+v] = ens_obj.subset_ds[ens][v].copy()
-        prefixes.append('ana_')
-
-    # Compute RH
-    for p in prefixes:
-        ens_obj = compute_RH(ens_obj, prefix=p)
-    
-    # Compute ensemble stats and analysis increment
-    param['state_vars'].append('RH_P0_L105_GLC0')
-    for v in param['state_vars']:
-        for p in prefixes:
-            ens_obj = compute_ens_stats_3D(ens_obj, f"{p}{v}")
-        if DA:
-            ens_obj = compute_ens_incr_3D(ens_obj, v)
-    
-    return ens_obj
-
-
 def only_retain_bgd_stats(param):
     """
     Only retain background stats plots in param
@@ -772,7 +615,7 @@ if __name__ == '__main__':
 
         # Run EnKF
         ens_obj, ob_coord_all = run_enkf(ens_obj, subset_ob_df, param, verbose=2)
-        ens_obj = post_enkf(ens_obj, param, DA=param['perform_da'])
+        ens_obj = ens_post.post_enkf(ens_obj, param, DA=param['perform_da'])
 
         # Make plots
         print()
