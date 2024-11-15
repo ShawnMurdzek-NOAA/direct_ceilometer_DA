@@ -118,7 +118,7 @@ def plot_horiz_postage_stamp(ens_obj, param, upp_field='bgd_TCDC_P0_L105_GLC0', 
     upp_field : string, optional
         UPP field to plot
     klvl : integer, optional
-        Vertical level to plot
+        Vertical level to plot. Ignored for 2D fields.
     ob_coord : np.array, optional
         Observation coordinates, (lon, lat)
     save_dir : string, optional
@@ -135,6 +135,12 @@ def plot_horiz_postage_stamp(ens_obj, param, upp_field='bgd_TCDC_P0_L105_GLC0', 
     
     if debug > 0:
         print(param['postage_stamp_plots'][upp_field])
+    
+    # Set klvl to NaN if 2D field
+    mem = ens_obj.mem_names[0]
+    if len(ens_obj.subset_ds[mem][upp_field].shape) == 2:
+        if debug > 1: print('  2D field. Setting klvl to NaN')
+        klvl = np.nan
 
     # Make plot
     fig = ens_obj.postage_stamp_contourf(upp_field, 
@@ -294,6 +300,88 @@ def plot_cld_obs(ens_obj, cld_ob_df, param, bins=np.arange(0, 2001, 250), nrows=
     cbar.set_label('observed cloud percentage', size=14)
 
     return fig
+
+
+def plot_ceil_obs(cld_ob_df, param, figsize=(6, 6), scatter_kw={}):
+    """
+    Plot observed cloud ceilings
+
+    Parameters
+    ----------
+    cld_ob_df : pd.DataFrame
+        Ceilometer observations used in the forward operator
+    param : dictionary
+        YAML inputs
+    figsize : tuple, optional
+        Figure size, by default (6, 6)
+    scatter_kw : dict, optional
+        Keyword arbuments passed to plt.scatter(), by default {}
+
+    Returns
+    -------
+    fig : plt.figure()
+        Plot with desired figure
+
+    """
+
+    # Make figure
+    fig = plt.figure(figsize=figsize)
+    ax = fig.add_subplot(1, 1, 1, projection=ccrs.LambertConformal())
+
+    # Plot observed ceilings
+    cax = ax.scatter(cld_ob_df['XOB'] - 360, cld_ob_df['YOB'], c=cld_ob_df['CEILING'], transform=ccrs.PlateCarree(),
+                     **scatter_kw)
+    
+    # Add annotations
+    borders = cfeature.NaturalEarthFeature(category='cultural',
+                                           scale='50m',
+                                           facecolor='none',
+                                           name='admin_1_states_provinces')
+    ax.set_extent([param['min_lon'], param['max_lon'], param['min_lat'], param['max_lat']])
+    ax.coastlines('50m', edgecolor='gray', linewidth=0.5)
+    ax.add_feature(borders, linewidth=0.5, edgecolor='gray')
+    
+    cbar = plt.colorbar(cax, ax=ax, orientation='vertical')
+    cbar.set_label('cloud ceiling (m)', size=14)
+
+    return fig
+
+
+def plot_obs_driver(cld_ob_df, ens_obj, ens_z1d, param):
+    """
+    Run functions to plot cloud observations
+
+    Parameters
+    ----------
+    cld_ob_df : pd.DataFrame
+        Ceilometer observations used in the forward operator
+    ens_obj : pyDA_utils.ensemble_utils.ensemble
+        Ensemble object
+    ens_z1d : array
+        Average vertical level heights (m)
+    param : dictionary
+        YAML inputs
+    
+    Returns
+    -------
+    None
+
+    """
+
+    # Plot cloud amounts in various vertical bins
+    bins = [0] + list(0.5*(ens_z1d[param['plot_stat_config']['klvls']][1:] + 
+                           ens_z1d[param['plot_stat_config']['klvls']][:-1]))
+    fig = plot_cld_obs(ens_obj, cld_ob_df, param, bins=bins, 
+                       nrows=param['plot_stat_config']['nrows'], 
+                       ncols=param['plot_stat_config']['ncols'],
+                       scatter_kw={'vmin':0, 'vmax':100, 'cmap':'plasma_r', 's':32, 'edgecolors':'k', 'linewidths':0.5})
+    plt.savefig(f"{param['out_dir']}/obs_clouds.png", dpi=500)
+    plt.close(fig)
+
+    # Plot observed cloud ceilings
+    fig = plot_ceil_obs(cld_ob_df, param, scatter_kw=param['obs_plots']['ceil'])
+    plt.savefig(f"{param['out_dir']}/obs_ceilings.png", dpi=500)
+    plt.close(fig)
 
 
 def plot_driver(ens_obj, param, save_dir, ob_coord, ens_zlvls, ens_z1d, verbose=0):

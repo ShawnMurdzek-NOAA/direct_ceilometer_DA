@@ -13,6 +13,8 @@ import datetime as dt
 import metpy.calc as mc
 from metpy.units import units
 
+import pyDA_utils.upp_postprocess as uppp
+
 
 #---------------------------------------------------------------------------------------------------
 # Functions
@@ -112,10 +114,34 @@ def compute_max_lapse_rate(ens_obj, prefix=''):
         ens_obj.subset_ds[mem][field] = ens_obj.subset_ds[mem]['CEIL_P0_L215_GLC0'].copy()
         T3D = ens_obj.subset_ds[mem][f"{prefix}TMP_P0_L105_GLC0"].values
         Z3D = ens_obj.subset_ds[mem][f"HGT_P0_L105_GLC0"].values
-        ens_obj.subset_ds[mem][field].values = np.amax((T3D[:-1, :, :] - T3D[1:, 0, 0]) / 
-                                                       1e-3*(Z3D[1:, :, :] - Z3D[:-1, 0, 0]), axis=0)
+        ens_obj.subset_ds[mem][field].values = np.amax((T3D[:-1, :, :] - T3D[1:, :, :]) / 
+                                                       (1e-3*(Z3D[1:, :, :] - Z3D[:-1, :, :])), axis=0)
         ens_obj.subset_ds[mem][field].attrs['long_name'] = 'column-maximum lapse rate'
         ens_obj.subset_ds[mem][field].attrs['units'] = 'K / km'
+
+    return ens_obj
+
+
+def convert_ceil_agl(ens_obj, compute_ceil_kw={}):
+    """
+    Convert cloud ceilings from height ASL to height AGL
+
+    Parameters
+    ----------
+    ens_obj : pyDA_utils.ensemble_utils.ensemble object
+        Ensemble output
+    compute_ceil_kw : dictionary, optional
+        Keyword arguments passed to uppp.compute_ceil_agl()
+    
+    Returns
+    -------
+    ens_obj : pyDA_utils.ensemble_utils.ensemble object
+        Ensemble output with cloud ceilings in height AGL
+
+    """
+
+    for mem in ens_obj.mem_names:
+        ens_obj.subset_ds[mem] = uppp.compute_ceil_agl(ens_obj.subset_ds[mem], **compute_ceil_kw)   
 
     return ens_obj
 
@@ -199,7 +225,7 @@ def compute_ens_incr_3D(ens_obj, field):
     return ens_obj
 
 
-def post_enkf(ens_obj, param, DA=True, pseudo_ceil=True, max_lr=True):
+def post_enkf(ens_obj, param, DA=True, pseudo_ceil=True, max_lr=True, compute_ceil_agl=True):
     """
     Main driver for postprocessing EnKF output
 
@@ -220,6 +246,8 @@ def post_enkf(ens_obj, param, DA=True, pseudo_ceil=True, max_lr=True):
         Option to compute pseudo ceilings using RH
     max_lr : boolean, optional
         Option to compute column-maximum lapse rates
+    compute_ceil_agl : boolean, optional
+        Option to compute cloud ceiling AGL heights
 
     Returns
     -------
@@ -236,18 +264,36 @@ def post_enkf(ens_obj, param, DA=True, pseudo_ceil=True, max_lr=True):
                 ens_obj.subset_ds[ens]['ana_'+v] = ens_obj.subset_ds[ens][v].copy()
         prefixes.append('ana_')
 
-    # Compute RH
+    # Cloud ceiling fields to convert to AGL
+    ceil_fields = {'CEIL_LEGACY':'HGT_P0_L215_GLC0', 
+                   'CEIL_EXP1':'CEIL_P0_L215_GLC0',
+                   'CEIL_EXP2':'CEIL_P0_L2_GLC0'}
+    
+    # Fields to compute increments and statistics for
+    incr_fields = param['state_vars'] + ['RH_P0_L105_GLC0']
+    stats_fields = param['state_vars'] + ['RH_P0_L105_GLC0']
+
+    # Compute derived fields
     for p in prefixes:
         ens_obj = compute_RH(ens_obj, prefix=p)
-        ens_obj = compute_pseudo_ceil(ens_obj, prefix=p)
-        ens_obj = compute_max_lapse_rate(ens_obj, prefix=p)
+        if pseudo_ceil:
+            ens_obj = compute_pseudo_ceil(ens_obj, prefix=p, RH_thres=param['plot_postage_config']['pseudo_ceil_RH_thres'])
+            ceil_fields[f'{p}PCEIL'] = f'{p}PCEIL_P0_L215_GLC0'
+            incr_fields.append('PCEIL')
+        if max_lr:
+            ens_obj = compute_max_lapse_rate(ens_obj, prefix=p)
+            incr_fields.append('MAXLR')
+    
+    # Compute cloud ceiling heights AGL
+    if compute_ceil_agl:
+        ens_obj = convert_ceil_agl(ens_obj, compute_ceil_kw={'no_ceil':np.nan, 'fields':ceil_fields})
     
     # Compute ensemble stats and analysis increment
-    param['state_vars'].append('RH_P0_L105_GLC0')
-    for v in param['state_vars']:
+    for v in stats_fields:
         for p in prefixes:
             ens_obj = compute_ens_stats_3D(ens_obj, f"{p}{v}")
-        if DA:
+    if DA:
+        for v in incr_fields:
             ens_obj = compute_ens_incr_3D(ens_obj, v)
     
     return ens_obj

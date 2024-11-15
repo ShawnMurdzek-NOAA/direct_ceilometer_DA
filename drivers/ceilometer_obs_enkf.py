@@ -589,14 +589,7 @@ if __name__ == '__main__':
 
     # Create plot of observations
     print('create plot with obs cloud fractions')
-    bins = [0] + list(0.5*(ens_z1d[param['plot_stat_config']['klvls']][1:] + 
-                           ens_z1d[param['plot_stat_config']['klvls']][:-1]))
-    fig = ens_viz.plot_cld_obs(ens_obj, cld_ob_df, param, bins=bins, 
-                               nrows=param['plot_stat_config']['nrows'], 
-                               ncols=param['plot_stat_config']['ncols'],
-                               scatter_kw={'vmin':0, 'vmax':100, 'cmap':'plasma_r', 's':32, 'edgecolors':'k', 'linewidths':0.5})
-    plt.savefig(f"{param['out_dir']}/obs_clouds.png", dpi=500)
-    plt.close(fig)
+    ens_viz.plot_obs_driver(cld_ob_df, ens_obj, ens_z1d, param)
 
     # Loop over each experiment
     for da_exp in param['ob_sel'].keys():

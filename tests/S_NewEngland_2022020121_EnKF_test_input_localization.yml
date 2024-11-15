@@ -72,11 +72,12 @@ out_dir: '/ncrc/home2/Shawn.S.Murdzek/src/direct_ceilometer_DA/tests/test_locali
 # If only plotting background fields, it helps to set plot_stat_config/plot_bgd_once to True
 perform_da: True
 
-# Misc options
+# Misc options (will be removed in the future)
 do_bec: False
 
 # Options for single observation test
 # In ob_sel, first key is test name, second key is the station ID, and the values are the ob indices
+# To assimilate all ceilometer observations in the subset domain, set entire_file: True
 ob_sel:
   single_ob:
     KHFD:
@@ -106,6 +107,16 @@ localization:
   use: True
   lh: 50
   lv: 4
+
+# Observed cloud ceiling plotting options
+obs_plots:
+  ceil:
+    vmin: 400
+    vmax: 1200
+    cmap: 'plasma'
+    s: 200
+    edgecolors: 'k'
+    linewidths: 0.5
 
 # Postage stamp plotting options
 # Structure:
@@ -174,6 +185,45 @@ postage_stamp_plots:
           - 5
     ob_plot:
       <<: *ob_plot
+  bgd_PCEIL: &PCEIL_postage
+    title: 'Pseudo Cloud Ceilings (RH_thres = 98%)'
+    save_tag: 'PCEIL_bgd'
+    cntf_kw:
+      cmap: 'plasma'
+      extend: 'both'
+      levels:
+        range:
+          - 400
+          - 1200 
+          - 50
+    ob_plot:
+      <<: *ob_plot
+  CEIL_EXP2: &CEIL_postage
+    title: 'Cloud Ceilings (exp 2)'
+    save_tag: 'CEIL_bgd'
+    cntf_kw:
+      cmap: 'plasma'
+      extend: 'both'
+      levels:
+        range:
+          - 400
+          - 1200 
+          - 50
+    ob_plot:
+      <<: *ob_plot
+  bgd_MAXLR: &MAXLR_postage
+    title: 'Column-Max Lapse Rate'
+    save_tag: 'MAXLR_bgd'
+    cntf_kw:
+      cmap: 'plasma'
+      extend: 'max'
+      levels:
+        range:
+          - 8
+          - 11 
+          - 0.25
+    ob_plot:
+      <<: *ob_plot
   incr_RH_P0_L105_GLC0:
     title: 'Relative Humidity'
     save_tag: 'RH_incr'
@@ -185,6 +235,19 @@ postage_stamp_plots:
           - -23
           - 23.1 
           - 2
+    ob_plot:
+      <<: *ob_plot
+  incr_PCEIL:
+    title: 'Pseudo Cloud Ceilings'
+    save_tag: 'PCEIL_incr'
+    cntf_kw:
+      cmap: 'bwr'
+      extend: 'both'
+      levels:
+        range:
+          - -205
+          - 205.1 
+          - 10
     ob_plot:
       <<: *ob_plot
   ana_RH_P0_L105_GLC0:
@@ -200,6 +263,7 @@ plot_postage_config:
     - 12
     - 10
   skewt: True
+  pseudo_ceil_RH_thres: 98
 
 # Ensemble statistic plotting options
 ens_stats_plots:
