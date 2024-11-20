@@ -263,6 +263,8 @@ plot_postage_config:
     - 12
     - 10
   skewt: True
+  lapse_rate: True
+  z_max: 1500
   pseudo_ceil_RH_thres: 98
 
 # Ensemble statistic plotting options

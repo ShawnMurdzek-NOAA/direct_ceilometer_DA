@@ -221,6 +221,74 @@ def plot_skewt_postage_stamp(ens_obj, param, lat, lon):
     return fig
 
 
+def plot_lapse_rate(ens_obj, param, lat, lon):
+    """
+    Plot vertical profiles of lapse rates for a single (lat, lon) coordinate for all ensemble
+    members
+
+    Parameters
+    ----------
+    ens_obj : pyDA_utils.ensemble_utils.ensemble
+        Ensemble object
+    param : dictionary
+        YAML inputs
+    lat : float
+        Latitude to compute lapse rates for (deg N)
+    lon : float
+        Longitude to compute lapse rates for (deg E)
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Figure containing vertical profiles of lapse rates
+
+    """
+
+    # Determine model indices closest to (lat, lon)
+    mem1 = ens_obj.mem_names[0]
+    im, jm = np.unravel_index(np.argmin((ens_obj.subset_ds[mem1]['gridlat_0'].values - lat)**2 +
+                                        (ens_obj.subset_ds[mem1]['gridlon_0'].values - lon)**2),
+                                ens_obj.subset_ds[mem1]['gridlat_0'].shape)
+
+    # Create figure
+    nrows = param['plot_postage_config']['nrows']
+    ncols = param['plot_postage_config']['ncols']
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=param['plot_postage_config']['figsize'],
+                             sharex=True, sharey=True)
+    plt.subplots_adjust(hspace=0.35)
+
+    # Loop over each ensemble member
+    for i, mem in enumerate(ens_obj.mem_names):
+
+        ax = axes[int(i / ncols), i % ncols]
+
+        # Extract model level heights
+        z1d = ens_obj.subset_ds[mem]['HGT_P0_L105_GLC0'].values[:, im, jm]
+        zavg = 0.5 * (z1d[1:] + z1d[:-1])
+
+        # Plot lapse rates
+        for prefix, c, ls in zip(['bgd_', 'ana_'], ['b', 'r'], ['-', '--']):
+            T1d = ens_obj.subset_ds[mem][f'{prefix}TMP_P0_L105_GLC0'].values[:, im, jm]
+            LR = (T1d[:-1] - T1d[1:]) / (1e-3*(z1d[1:] - z1d[:-1]))
+            ax.plot(LR, zavg, c=c, ls=ls)
+        
+        # Make plot look nice
+        ax.axvline(9.8, c='k', ls='--')
+        ax.grid()
+        ax.set_xlim([8, 12])
+        ax.set_ylim([0, param['plot_postage_config']['z_max']])
+        ax.set_title(mem, size=14)
+    
+    # Add axes labels
+    for i in range(nrows):
+        axes[i, 0].set_ylabel('height\n(m AGL)', size=14)
+    for i in range(ncols):
+        axes[-1, i].set_xlabel('lapse rate\n(K / km)', size=14)
+    plt.suptitle(f"{lat:.2f} deg N, {lon:.2f} deg E (blue: background, red: analysis)", size=16)
+
+    return fig
+
+
 def plot_cld_obs(ens_obj, cld_ob_df, param, bins=np.arange(0, 2001, 250), nrows=2, ncols=4, figsize=(10, 10), 
                  hofx_kw={}, scatter_kw={}):
     """
@@ -416,6 +484,13 @@ def plot_driver(ens_obj, param, save_dir, ob_coord, ens_zlvls, ens_z1d, verbose=
         if verbose > 0: print('Making Skew-T diagram postage stamps...')
         fig = plot_skewt_postage_stamp(ens_obj, param, ob_coord[0, 2], ob_coord[0, 1])
         plt.savefig(f"{save_dir}/postage_stamp_skewt_{param['save_tag']}.pdf")  # Save as a PDF to make it easier to zoom in
+        plt.close(fig)
+    
+    # Make lapse rate postage stamp plots for the first observation location
+    if param['plot_postage_config']['lapse_rate']:
+        if verbose > 0: print('Making lapse rate postage stamps...')
+        fig = plot_lapse_rate(ens_obj, param, ob_coord[0, 2], ob_coord[0, 1])
+        plt.savefig(f"{save_dir}/postage_stamp_lapse_rate_{param['save_tag']}.png", dpi=500)
         plt.close(fig)
 
     # Plot ensemble mean and standard deviation

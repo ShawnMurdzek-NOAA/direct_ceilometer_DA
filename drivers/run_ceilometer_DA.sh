@@ -3,7 +3,7 @@
 #SBATCH -A bil-pmp
 #SBATCH -J run_ceilometer_DA
 #SBATCH -o %x-%j.out
-#SBATCH -t 3:00:00
+#SBATCH -t 1:30:00
 #SBATCH -p batch
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
