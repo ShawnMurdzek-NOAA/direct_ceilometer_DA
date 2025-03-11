@@ -1,0 +1,53 @@
+# Input Parameters for Ceiling Comparisons Between Ensemble and Observations
+#---------------------------------------------------------------------------
+
+# Model initialization times (YYYYMMDDHH). Note that 1-hr forecasts are used in this program
+dates:
+  - 2022020107
+  - 2022020108
+  - 2022020110
+  - 2022020112
+  - 2022020113
+  - 2022020114
+  - 2022020115
+  - 2022020116
+  - 2022020117
+  - 2022020118
+  - 2022020119
+  - 2022020120
+  - 2022020121
+  - 2022020200
+  - 2022020201
+  - 2022020202
+  - 2022020203
+  - 2022020204
+  - 2022020205
+  - 2022020206
+  - 2022020207
+  - 2022020208
+  - 2022020209
+  - 2022020210
+  - 2022020211
+  - 2022020212
+  - 2022020213
+  - 2022020214
+  - 2022020215
+
+# UPP output for each ensemble member
+upp_format: '/gpfs/f6/bil-pmp/scratch/Shawn.S.Murdzek/RRFS_Ens_Cloud_DA/Feb2022_retro/Ens_GDAS_SDLVDL_noGF_cloud1/v0.6.2/prod/rrfs_conus_3km_ensda.{day}/{hr}/mem{num:04d}/rrfs.t{hr}z.prslev.f001.conus_3km.grib2'
+nmem: 30
+
+# Verifying BUFR obs
+bufr_format: '/gpfs/f6/bil-pmp/scratch/Shawn.S.Murdzek/real_obs/decoded_bufr_for_cloudDA/{date}.rap.prepbufr.csv'
+
+# Ceiling field name
+ceil_field: 'CEIL_P0_L2_GLC0'
+
+# Plotting options
+xlim:
+  - -134.1
+  - -60.9
+ylim:
+  - 10
+  - 53
+out_tag: '75_25'
