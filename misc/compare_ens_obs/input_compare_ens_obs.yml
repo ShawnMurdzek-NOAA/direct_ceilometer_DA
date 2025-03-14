@@ -13,25 +13,17 @@ dates:
   - 2022020116
   - 2022020117
   - 2022020118
-  - 2022020119
   - 2022020120
   - 2022020121
   - 2022020200
   - 2022020201
-  - 2022020202
-  - 2022020203
   - 2022020204
   - 2022020205
-  - 2022020206
   - 2022020207
   - 2022020208
   - 2022020209
   - 2022020210
   - 2022020211
-  - 2022020212
-  - 2022020213
-  - 2022020214
-  - 2022020215
 
 # UPP output for each ensemble member
 upp_format: '/gpfs/f6/bil-pmp/scratch/Shawn.S.Murdzek/RRFS_Ens_Cloud_DA/Feb2022_retro/Ens_GDAS_SDLVDL_noGF_cloud1/v0.6.2/prod/rrfs_conus_3km_ensda.{day}/{hr}/mem{num:04d}/rrfs.t{hr}z.prslev.f001.conus_3km.grib2'

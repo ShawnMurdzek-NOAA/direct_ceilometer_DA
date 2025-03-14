@@ -55,7 +55,7 @@ def read_ensemble_output_1time(param, time, verbose=1):
     
     # Verifying observation file name
     obs_format = param['bufr_format']
-    obs_fname = obs_format.format(date=time.strftime("%Y%m%d%H%M"))
+    obs_fname = obs_format.format(date=(time+dt.timedelta(hours=1)).strftime("%Y%m%d%H%M"))
 
     # Read ensemble output
     start = dt.datetime.now()
@@ -160,6 +160,7 @@ if __name__ == '__main__':
 
         # Compute ensemble stats
         mem_names = list(ens_obj.subset_ds.keys())
+        ceil_ens_med = np.median(ceil_ens.loc[:, mem_names].values, axis=1)
         ceil_ens_75 = np.percentile(ceil_ens.loc[:, mem_names].values, 75, axis=1)
         ceil_ens_25 = np.percentile(ceil_ens.loc[:, mem_names].values, 25, axis=1)
 
@@ -167,15 +168,15 @@ if __name__ == '__main__':
         fig = plt.figure(figsize=(12, 12))
 
         ax = fig.add_subplot(2, 1, 1, projection=ccrs.LambertConformal())
-        idx = np.where(np.logical_and(ceil_ens_75 < 3000, ceil_obs['CEILING'] > 19000))[0]
+        idx = np.where(np.logical_and(ceil_ens_med < 3000, ceil_obs['CEILING'] > 19000))[0]
         ax.plot(ceil_obs['XOB'][idx].values - 360., ceil_obs['YOB'][idx].values, 'b.', transform=ccrs.PlateCarree())
-        ax.set_title('Ensemble 75th Percentile Has Spurious Ceilings', size=14)
+        ax.set_title('Ensemble Median Has Spurious Ceilings', size=14)
         ax = config_ax(ax, param)
 
         ax = fig.add_subplot(2, 1, 2, projection=ccrs.LambertConformal())
-        idx = np.where(np.logical_and(ceil_ens_25 > 19000, ceil_obs['CEILING'] < 3000))[0]
+        idx = np.where(np.logical_and(ceil_ens_med > 19000, ceil_obs['CEILING'] < 3000))[0]
         ax.plot(ceil_obs['XOB'][idx].values - 360., ceil_obs['YOB'][idx].values, 'r.', transform=ccrs.PlateCarree())
-        ax.set_title('Ensemble 25th Percentile is Missing Ceilings', size=14)
+        ax.set_title('Ensemble Median is Missing Ceilings', size=14)
         ax = config_ax(ax, param)
 
         plt.subplots_adjust(left=0.05, bottom=0.05, right=0.95, top=0.92)
