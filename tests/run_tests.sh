@@ -13,6 +13,11 @@ keep_yaml=False
 
 #---------------------------------------------------------------------------------------------------
 
+# Add direct_ceilometer_DA to PYTHONPATH
+cd ../../
+export PYTHONPATH=$PYTHONPATH:$( pwd )
+cd direct_ceilometer_DA/tests
+
 home=$( pwd )
 
 if [[ ${run_basic} ]]; then
