@@ -19,7 +19,7 @@ from metpy.units import units
 from metpy.plots import SkewT
 
 import direct_ceilometer_DA.main.cloud_DA_forward_operator as cfo
-import pyDA_utils.plot_model_data as pmd
+import direct_ceilometer_DA.external.pyDA_utils.plot_model_data as pmd
 
 
 #---------------------------------------------------------------------------------------------------

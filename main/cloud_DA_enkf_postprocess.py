@@ -13,7 +13,7 @@ import datetime as dt
 import metpy.calc as mc
 from metpy.units import units
 
-import pyDA_utils.upp_postprocess as uppp
+import direct_ceilometer_DA.external.pyDA_utils.upp_postprocess as uppp
 
 
 #---------------------------------------------------------------------------------------------------
