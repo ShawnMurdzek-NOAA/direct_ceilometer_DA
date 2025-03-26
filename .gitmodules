@@ -1,3 +1,3 @@
-[submodule "pyDA_utils"]
-	path = pyDA_utils
+[submodule "external/pyDA_utils"]
+	path = external/pyDA_utils
 	url = https://github.com/ShawnMurdzek-NOAA/pyDA_utils.git
