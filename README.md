@@ -24,7 +24,7 @@ conda env create -f python_environment.yml --prefix {ENV_PREFIX}
 conda activate {ENV_PREFIX}
 ```
 
-The program requires a single YAML input file. Examples can be found in the `tests/` directory. The program can be run using the following command, with `{YAML}` replaced with the input YAML file name:
+The program requires a single YAML input file. Examples can be found in the `tests/` directory and more details can be found in `README_inputs.md`. The program can be run using the following command, with `{YAML}` replaced with the input YAML file name:
 
 `python ceilometer_obs_enkf.py {YAML}`
 
