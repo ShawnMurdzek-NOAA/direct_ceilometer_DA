@@ -29,12 +29,12 @@ import matplotlib
 import copy
 import sys
 
-import direct_ceilometer_DA.external.pyDA_utils.plot_model_data as pmd
-import direct_ceilometer_DA.external.pyDA_utils.bufr as bufr
-import direct_ceilometer_DA.external.pyDA_utils.ensemble_utils as eu
-import direct_ceilometer_DA.external.pyDA_utils.upp_postprocess as uppp
-import direct_ceilometer_DA.main.cloud_DA_forward_operator as cfo
-import direct_ceilometer_DA.main.cloud_DA_forward_operator_viz as cfov
+import pyDA_utils.plot_model_data as pmd
+import pyDA_utils.bufr as bufr
+import pyDA_utils.ensemble_utils as eu
+import pyDA_utils.upp_postprocess as uppp
+import main.cloud_DA_forward_operator as cfo
+import main.cloud_DA_forward_operator_viz as cfov
 
 
 #---------------------------------------------------------------------------------------------------

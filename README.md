@@ -4,7 +4,6 @@ Sandbox for developing a direct ceilometer DA algorithm using an Ensemble Square
 
 ## Contents
 
-- `drivers/`: Primary drivers for various cloud DA programs.
 - `external/`: Submodules used by this program (e.g., [pyDA_utils](https://github.com/ShawnMurdzek-NOAA/pyDA_utils/tree/main)).
 - `main/`: Main code for the direct ceilometer cloud DA.
 - `misc/`: Miscellaneous files.
@@ -13,9 +12,29 @@ Sandbox for developing a direct ceilometer DA algorithm using an Ensemble Square
 
 ## Quick Start Guide
 
-The following steps will download the program (including the required submodules), create a new Python environment (if needed), and run the test cases
+Start by downloading the code from GitHub, including the required submodules:
 
-1. `git clone --recurse-submodules https://github.com/ShawnMurdzek-NOAA/direct_ceilometer_DA.git`
-2. Load a Python environment with the required packages. It is possible that you may already have a Python environment with all the required packages because the dependencies are somewhat common in atmospheric science (e.g., NumPy, Xarray). If not, a new environment can be created from python_environment.yml using the command `conda env create -f python_environment.yml`.
-3. `cd direct_ceilometer_DA/tests`
-4. `bash run_tests.sh`
+`git clone --recurse-submodules https://github.com/ShawnMurdzek-NOAA/direct_ceilometer_DA.git`
+
+Next, configure the required Python environment. If conda is enabled, a new environment can be created by running the following, with `{ENV_PREFIX}` replaced with the desired install location for the new environment:
+
+```
+cd direct_ceilometer_DA
+conda env create -f python_environment.yml --prefix {ENV_PREFIX}
+conda activate {ENV_PREFIX}
+```
+
+The program requires a single YAML input file. Examples can be found in the `tests/` directory. The program can be run using the following command, with `{YAML}` replaced with the input YAML file name:
+
+`python ceilometer_obs_enkf.py {YAML}`
+
+### Running the test cases
+
+Test cases, along with sample output, are included in the `tests/` directory. To run these tests, activate the required Python environment (see above), then run the following:
+
+```
+cd tests
+bash run_tests.sh
+```
+
+The top portion of `run_tests.sh` can be edited to control which test cases are run.

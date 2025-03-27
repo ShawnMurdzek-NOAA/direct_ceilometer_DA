@@ -25,9 +25,9 @@ import scipy.interpolate as si
 import scipy.ndimage as sn
 import matplotlib.pyplot as plt
 
-from direct_ceilometer_DA.external.pyDA_utils import bufr
-import direct_ceilometer_DA.external.pyDA_utils.upp_postprocess as uppp
-import direct_ceilometer_DA.main.cloud_DA_forward_operator_viz as cfov
+from pyDA_utils import bufr
+import pyDA_utils.upp_postprocess as uppp
+import main.cloud_DA_forward_operator_viz as cfov
 
 
 #---------------------------------------------------------------------------------------------------

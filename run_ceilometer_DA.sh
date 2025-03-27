@@ -22,10 +22,11 @@ cp -r ${code_path} .
 # Activate Python environment
 module load python
 source activate my_py
-export PYTHONPATH=$PYTHONPATH:/ncrc/home2/Shawn.S.Murdzek/src/
+#export PYTHONPATH=$PYTHONPATH:/ncrc/home2/Shawn.S.Murdzek/src/
 which python
 
 # Run code
-python ./direct_ceilometer_DA/drivers/ceilometer_obs_enkf.py ./${yml_fname}
+cd direct_ceilometer_DA
+python -u ceilometer_obs_enkf.py ../${yml_fname}
 
 date

@@ -4,7 +4,7 @@
 tmpl_yml="S_NewEngland_2022020121_EnKF_input.yml"
 final_yml=${tmpl_yml}
 code_dir="/ncrc/home2/Shawn.S.Murdzek/src/direct_ceilometer_DA"
-run_script="${code_dir}/drivers/run_ceilometer_DA.sh"
+run_script="${code_dir}/run_ceilometer_DA.sh"
 out_dir=`pwd`
 
 # State variables, delimited with a semicolon
