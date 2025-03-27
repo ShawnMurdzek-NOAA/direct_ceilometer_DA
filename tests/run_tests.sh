@@ -4,11 +4,11 @@
 # Note: The appropriate Python environment must be activated prior to running this bash script
 
 # Specify which test cases to run
-run_basic=True
-run_localize=True
+run_basic='True'
+run_localize='True'
 
 # Option to keep test YAML files
-keep_yaml=False
+keep_yaml='False'
 
 
 #---------------------------------------------------------------------------------------------------
@@ -20,7 +20,7 @@ cd direct_ceilometer_DA/tests
 
 home=$( pwd )
 
-if [[ ${run_basic} ]]; then
+if [[ ${run_basic} == 'True' ]]; then
   echo
   echo "Running basic EnKF test case..."
   yml_name='basic_test.yml'
@@ -32,12 +32,12 @@ if [[ ${run_basic} ]]; then
   fi
   mkdir ${test_dir}
   python ../drivers/ceilometer_obs_enkf.py ${yml_name}
-  if [[ ! ${keep_yaml} ]]; then
+  if [[ ${keep_yaml} == 'False' ]]; then
     rm ${yml_name}
   fi
 fi
 
-if [[ ${run_localize} ]]; then
+if [[ ${run_localize} == 'True' ]]; then
   echo
   echo "Running localization EnKF test case..."
   yml_name='localize_test.yml'
@@ -49,7 +49,7 @@ if [[ ${run_localize} ]]; then
   fi
   mkdir ${test_dir}
   python ../drivers/ceilometer_obs_enkf.py ${yml_name}
-  if [[ ! ${keep_yaml} ]]; then
+  if [[ ${keep_yaml} == 'False' ]]; then
     rm ${yml_name}
   fi
 fi
