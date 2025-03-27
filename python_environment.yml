@@ -63,6 +63,8 @@ dependencies:
   - frozenlist=1.5.0=py39h9399b63_1
   - fsspec=2025.3.0=pyhd8ed1ab_0
   - g2clib=1.6.0=3
+  - geographiclib=2.0=pyhd8ed1ab_1
+  - geopy=2.4.1=pyhd8ed1ab_2
   - geos=3.11.1=h27087fc_0
   - geotiff=1.7.1=h7a142b4_6
   - gettext=0.23.1=h5888daf_0
