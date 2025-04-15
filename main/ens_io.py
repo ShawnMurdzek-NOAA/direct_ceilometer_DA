@@ -11,8 +11,6 @@ shawn.s.murdzek@noaa.gov
 import xarray as xr
 import numpy as np
 
-import pyDA_utils.ensemble_utils as eu
-
 
 #---------------------------------------------------------------------------------------------------
 # Contents
@@ -63,7 +61,7 @@ class ens_data():
 def read_parse_mpas(fnames, 
                     fix_fname, 
                     state_fields=['theta', 'qv', 'cldfrac'], 
-                    other_fields=[], 
+                    other_fields={}, 
                     verbose=0):
     """
     Read and parse MPAS netCDF input
@@ -77,8 +75,9 @@ def read_parse_mpas(fnames,
         NetCDF file containing mesh information
     state_fields : list, optional
         Fields to include in the state matrix (must be 3D)
-    other_fields : list, optional
-        Other fields to extract (can have any dimensions)
+    other_fields : dictionary, optional
+        Other fields to extract (can have any dimensions). Key is MPAS field name, value is the 
+        general name for the field
     verbose : int, optional
         Verbosity level
 
@@ -110,28 +109,107 @@ def read_parse_mpas(fnames,
         for v in state_fields:
             state[idx:(idx+N3d), i] = np.flatten(ds[v].values)
             idx = idx + N3d
-        for v in other_fields:
-            other[v].append(np.flatten(ds[v].values))
+        for key in other_fields.keys():
+            other[other_fields[key]].append(np.flatten(ds[key].values))
     
     # Convert other output into arrays
-    for v in other_fields:
-        other[v] = np.array(other[v])
+    for key in other_fields.keys():
+        name = other_fields[key]
+        other[name] = np.array(other[name])
 
     return ens_data(state, state_fields, loc, other=other)
 
 
 def read_parse_upp(fnames, 
-                   state_fields=['TMP_P0_L105_GLC0', 'SPFH_P0_L105_GLC0', 'TCDC_P0_L105_GLC0'], 
-                   other_fields=[], 
+                   state_fields=['TMP_P0_L105_GLC0', 'SPFH_P0_L105_GLC0', 'FRACCC_P0_L105_GLC0'], 
+                   other_fields={}, 
                    verbose=0):
     """
-    Read in UPP output. 
+    Read and parse UPP GRIB2 input
+
+    Parameters
+    ----------
+    fnames : list
+        GRIB2 files containing UPP output. Each entry is a different ensemble member
+    state_fields : list, optional
+        Fields to include in the state matrix (must be 3D)
+    other_fields : dictionary, optional
+        Other fields to extract (can have any dimensions). Key is UPP field name, value is the 
+        general name for the field
+    verbose : int, optional
+        Verbosity level
+
+    Returns
+    -------
+    ens_data object
+        Ensemble output
+
     """
 
+    # Read in grid info
+    if verbose > 0: print('Reading UPP grid information')
+    fix_ds = xr.open_dataset(fnames[0], engine='pynio')
+    shape_3d = fix_ds['HGT_P0_L105_GLC0'].shape
+    loc = {'lat': np.flatten(fix_ds['gridlat_0'].values),
+           'lon': np.flatten(fix_ds['gridlon_0'].values),
+           'hgt': np.reshape(fix_ds['HGT_P0_L105_GLC0'].values - 
+                             fix_ds['HGT_P0_L1_GLC0'].values[np.newaxis, :, :], 
+                             shape=(shape_3d[1] * shape_3d[2], shape_3d[0]))}
 
-def read_ens(fnames, state_fields=[], other_fields=[], verbose=0, fix_fname=None, ftype='mpas'):
+    # Read in ensemble data
+    if verbose > 0: print('Reading UPP atmospheric information')
+    N3d = loc['hgt'].size
+    Nens = len(fnames)
+    state = np.zeros((N3d * len(state_fields), Nens))
+    other = {}
+    for f in other_fields:
+        other[f] = []
+    for i, f in enumerate(fnames):
+        ds = xr.open_dataset(f)
+        idx = 0
+        for v in state_fields:
+            state[idx:(idx+N3d), i] = np.flatten(ds[v].values)
+            idx = idx + N3d
+        for key in other_fields.keys():
+            other[other_fields[key]].append(np.flatten(ds[key].values))
+    
+    # Convert other output into arrays
+    for key in other_fields.keys():
+        name = other_fields[key]
+        other[name] = np.array(other[name])
+
+    return ens_data(state, state_fields, loc, other=other)
+
+
+def read_ens(fnames, 
+             state_fields=['theta', 'qv', 'cldfrac'], 
+             other_fields={}, 
+             verbose=0, 
+             fix_fname=None, 
+             ftype='mpas'):
     """
-    Read ensemble output and save as an ens_data object
+    Read ensemble output
+
+    Parameters
+    ----------
+    fnames : list
+        Ensemble member file names
+    state_fields : list, optional
+        Fields to include in the state matrix (must be 3D)
+    other_fields : dictionary, optional
+        Other fields to extract (can have any dimensions). Key is field name, value is the 
+        general name for the field
+    verbose : int, optional
+        Verbosity level
+    fix_fname : string, optional
+        File containing grid or mesh information. Only needed for MPAS output
+    ftype : string, optional
+        Input file type. Options: 'mpas' or 'upp'
+    
+    Returns
+    -------
+    ens_data object
+        Ensemble output
 
     """
 
