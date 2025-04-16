@@ -58,6 +58,45 @@ class ens_data():
         self.meta['Nvars'] = len(varnames)
     
 
+    def var_dict(self, n):
+        """
+        Return all variables (in state, loc, and other) as a dictionary for a single ensemble member
+
+        Parameters
+        ----------
+        n : integer
+            Ensemble member number (starting with 0)
+        
+        Returns
+        -------
+        dictionary
+            Model output as a dictionary
+
+        """
+        
+        out_dict = {}
+        N2d = self.meta['N2d']
+        Nz = self.meta['Nz']
+        N3d = N2d * Nz
+
+        # State variables
+        print(N2d)
+        for i, v in enumerate(self.varnames):
+            out_dict[v] = np.reshape(self.state[(N3d*i):(N3d*(i+1)), n], newshape=(N2d, Nz))
+
+        # Locations
+        print(N2d)
+        for key in self.loc.keys():
+            out_dict[key] = self.loc[key]
+
+        # Other variables
+        print(N2d)
+        for key in self.other.keys():
+            out_dict[key] = np.reshape(self.other[key][:, n], newshape=(N2d, Nz))
+
+        return out_dict
+    
+
 def read_parse_mpas(fnames, 
                     fix_fname, 
                     state_fields=['theta', 'qv', 'cldfrac'], 
@@ -115,7 +154,7 @@ def read_parse_mpas(fnames,
     # Convert other output into arrays
     for key in other_fields.keys():
         name = other_fields[key]
-        other[name] = np.array(other[name])
+        other[name] = np.array(other[name]).T
 
     return ens_data(state, state_fields, loc, other=other)
 
@@ -176,7 +215,7 @@ def read_parse_upp(fnames,
     # Convert other output into arrays
     for key in other_fields.keys():
         name = other_fields[key]
-        other[name] = np.array(other[name])
+        other[name] = np.array(other[name]).T
 
     return ens_data(state, state_fields, loc, other=other)
 

@@ -19,7 +19,7 @@ from pyDA_utils import bufr
 # Contents
 #---------------------------------------------------------------------------------------------------
 
-def read_bufr_obs(fname, subset=['ADPSFC', 'MSONET'], domain=None):
+def read_bufr_obs(fname, subset=['ADPSFC', 'MSONET'], domain=[]):
     """
     Read BUFR CSV observations
 
@@ -28,10 +28,10 @@ def read_bufr_obs(fname, subset=['ADPSFC', 'MSONET'], domain=None):
     fname : string
         BUFR CSV file name
     subset : list, optional
-        Observation subsets to retain. Set to None to not use
+        Observation subsets to retain. Set to an empty list to not use
     domain : list, optional
         Only keep obs within the specified spatial domain, [minlat, minlon, maxlat, maxlon].
-        Set to None to not use
+        Set to an empty list to not use
     
     Returns
     -------
@@ -44,7 +44,7 @@ def read_bufr_obs(fname, subset=['ADPSFC', 'MSONET'], domain=None):
     bufr_df = bufr.bufrCSV(fname).df
 
     # Only retain certain subsets
-    if subset is not None:
+    if len(subset) > 0:
         keep_idx = np.zeros(len(bufr_df))
         for s in subset:
             keep_idx[bufr_df['subset'] == s] = 1
@@ -52,7 +52,7 @@ def read_bufr_obs(fname, subset=['ADPSFC', 'MSONET'], domain=None):
         bufr_df.reset_index(inplace=True, drop=True)
 
     # Remove obs outside of the desired spatial domain
-    if domain is not None:
+    if len(domain) > 0:
         spatial_idx = np.where((bufr_df['YOB'] >= domain[0]) &
                                (bufr_df['YOB'] <= domain[2]) &
                                (bufr_df['XOB'] >= (360 + domain[1])) &

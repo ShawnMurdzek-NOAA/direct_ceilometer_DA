@@ -1,0 +1,34 @@
+# Input Parameters for Cloud DA Case Analysis
+#--------------------------------------------
+
+# Ensemble Information
+# 'path' should include a {num} placeholder for ensemble member number
+ens:
+  path: '/autofs/ncrc-svm1_home2/Shawn.S.Murdzek/src/direct_ceilometer_DA/tests/sample_data/mpas/mem{num:03d}/mpasout.2024-05-27_04.00.00.TEST.nc'
+  fix_file: '/autofs/ncrc-svm1_home2/Shawn.S.Murdzek/src/direct_ceilometer_DA/tests/sample_data/mpas/invariant_TEST.nc'
+  type: 'mpas'
+  verbose: 0
+
+# Observation Information
+obs:
+  fname: '/autofs/ncrc-svm1_home2/Shawn.S.Murdzek/src/direct_ceilometer_DA/tests/sample_data/bufr/2024052704.rap.t04z.prepbufr.csv'
+  domain: []
+  entire_file: False
+  ob_sel:
+    KHFD: [1]
+  verbose: 0
+
+# DA settings
+DA:
+  state_vars: ['theta', 'qv', 'cldfrac']
+  ob_var: 156.25
+  hofx_kw:
+    hgt_lim_kw:
+      max_hgt: 3500
+    cld_field: 'cldfrac'
+    verbose: 0
+  localization:
+    use: False
+    lh: 50
+    lv: 4
+  verbose: 2
