@@ -1,12 +1,6 @@
 """
 Cloud Data Assimilation Forward Operator
 
-Passed Arguments
-----------------
-    sys.argv[1] : BUFR CSV observation file name
-    sys.argv[2] : UPP model output
-    sys.argv[3] : Option to create plots (default: No plots. Set to 1 to make plots)
-
 shawn.s.murdzek@noaa.gov
 """
 
@@ -14,7 +8,6 @@ shawn.s.murdzek@noaa.gov
 # Import Modules
 #---------------------------------------------------------------------------------------------------
 
-import sys
 import xarray as xr
 import copy
 import datetime as dt
@@ -23,11 +16,6 @@ import pyproj
 import scipy.spatial as ss
 import scipy.interpolate as si
 import scipy.ndimage as sn
-import matplotlib.pyplot as plt
-
-from pyDA_utils import bufr
-import pyDA_utils.upp_postprocess as uppp
-import main.cloud_DA_forward_operator_viz as cfov
 
 
 #---------------------------------------------------------------------------------------------------
@@ -42,16 +30,21 @@ class sfc_cld_forward_operator():
     ----------
     ob_df : pd.DataFrame
         BUFR ceilometer cloud obs used by the forward operator
-    model_ds : xr.Dataset
-        Model background
+    model_dict : dictionary
+        Model output. Must include:
+            'hgt' : Height (m AGL). Dimensions: (N2d, Nz)
+            cld_field : Cloud cover (%). Dimensions: (N2d, Nz)
+    cld_field : string, optional
+        Name of cloud cover field in model_dict
     debug : integer, optional
         Debugging level (higher numbers print more output)
 
     """
 
-    def __init__(self, ob_df, model_ds, debug=0):
+    def __init__(self, ob_df, model_dict, cld_field='cldfrac', debug=0):
         self.ob_df = ob_df
-        self.model_ds = model_ds
+        self.model_dict = model_dict
+        self.cld_field = cld_field
         self.debug = debug
 
         # Define primary data structure used by this class
@@ -118,7 +111,7 @@ class sfc_cld_forward_operator():
 
 
     def interp_model_col_to_ob(self, method='nearest', proj_str='+proj=lcc +lat_0=39 +lon_0=-96 +lat_1=33 +lat_2=45',
-                               fields=['TCDC_P0_L105_GLC0', 'height_agl'], zgrid='lv_HYBL2'):
+                               fields=['cldfrac', 'hgt'], zgrid='lv_HYBL2'):
         """
         Wrapper method for interpolation of model vertical columns to ceilometer (lat, lon) locations
 
@@ -140,7 +133,6 @@ class sfc_cld_forward_operator():
         """
 
         self._apply_map_projection(proj_str=proj_str)
-        self._compute_model_height_agl()
 
         if self.debug > 0:
             print('sfc_cld_forward_operator: Starting interpolation of model output columns...')
@@ -178,37 +170,14 @@ class sfc_cld_forward_operator():
         self.proj_str = proj_str
         self.proj = pyproj.Proj(proj_str)
 
+        # Observational data
         self.data['x_proj'], self.data['y_proj'] = self.proj(self.data['lon'], self.data['lat'])
 
-        xtmp, ytmp = self.proj(self.model_ds['gridlon_0'].values, self.model_ds['gridlat_0'].values)
-        for data, name in zip([xtmp, ytmp], ['x_proj', 'y_proj']):
-            self.model_ds[name] = xr.DataArray(data=data, 
-                                               dims=self.model_ds['gridlon_0'].dims,
-                                               coords=self.model_ds['gridlon_0'].coords,
-                                               attrs={'units':'m'})
+        # Model data
+        self.model_dict['x_proj'], self.model_dict['y_proj'] = self.proj(self.model_dict['lon'], self.model_dict['lat'])
     
 
-    def _compute_model_height_agl(self):
-        """
-        Compute model heights AGL (from gpm MSL)
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None. Adds the field 'height_agl' to self.model_ds
-
-        """
-
-        self.model_ds['height_agl'] = xr.DataArray(data=uppp.convert_gpm_msl_to_m_agl(self.model_ds, 'HGT_P0_L105_GLC0'),
-                                                   dims=self.model_ds['HGT_P0_L105_GLC0'].dims,
-                                                   coords=self.model_ds['HGT_P0_L105_GLC0'].coords,
-                                                   attrs={'long_name':'height AGL', 'units':'m'})
-    
-
-    def _model_nearest_interp_col(self, fields=['TCDC_P0_L105_GLC0', 'height_agl']):
+    def _model_nearest_interp_col(self, fields=['TCDC_P0_L105_GLC0', 'hgt']):
         """
         Use nearest neighbor interpolation to interpolate model columns to obs (lat, lon) locations
 
@@ -223,24 +192,18 @@ class sfc_cld_forward_operator():
 
         """
 
-        fields_model = {}
         for f in fields:
             self.data[f'model_col_{f}'] = []
-            fields_model[f] = self.model_ds[f].values
 
-        xmodel = self.model_ds['x_proj'].values
-        ymodel = self.model_ds['y_proj'].values
-
-        model_KDTree = ss.KDTree(np.array([xmodel.ravel(), ymodel.ravel()]).T)
+        model_KDTree = ss.KDTree(np.array([self.model_dict['x_proj'], self.model_dict['y_proj']]).T)
         _, idx1d = model_KDTree.query(np.array([self.data['x_proj'], self.data['y_proj']]).T)
         for idx in idx1d:
-            i, j = np.unravel_index(idx, xmodel.shape)
             for f in fields:
-                self.data[f'model_col_{f}'].append(fields_model[f][:, i, j])
+                self.data[f'model_col_{f}'].append(self.model_dict[f][idx, :])
     
 
-    def impose_hgt_limits(self, min_hgt=10, max_hgt=3658, hgt_field='model_col_height_agl',
-                          fields=['model_col_height_agl', 'model_col_TCDC_P0_L105_GLC0', 'model_zgrid']):
+    def impose_hgt_limits(self, min_hgt=10, max_hgt=3658, hgt_field='model_col_hgt',
+                          fields=['model_col_hgt', 'model_col_TCDC_P0_L105_GLC0', 'model_zgrid']):
         """
         Impose min and max height limits to either the model or obs
 
@@ -270,7 +233,7 @@ class sfc_cld_forward_operator():
                 self.data[f][i] = self.data[f][i][cond_hgt]
     
 
-    def impose_min_cld_frac(self, min_cld_frac=5, field='model_col_TCDC_P0_L105_GLC0'):
+    def impose_min_cld_frac(self, min_cld_frac=5, field='model_col_cldfrac'):
         """
         Impose a minimum cloud fraction to the model cloud fraction field
 
@@ -317,7 +280,7 @@ class sfc_cld_forward_operator():
         self.data['ob_hgt_model'] = []
         for i in self.data['idx']:
             try:
-                model_z = self.data['model_col_height_agl'][i]
+                model_z = self.data['model_col_hgt'][i]
                 model_i = self.data['model_zgrid'][i]
             except KeyError:
                 print("In interp_ob_hgt_to_model_grid: Must interpolate model columns to ob locations first")
@@ -348,54 +311,6 @@ class sfc_cld_forward_operator():
             self.data[k] = [self.data[k][j] for j in keep_idx]
         
         self.data['idx'] = np.arange(len(keep_idx))
-
-    
-    def add_clear_obs_model(self, vert_roi=250):
-        """
-        Add clear obs where there are model clouds but no observed clouds
-
-        Parameters
-        ----------
-        vert_roi : float, optional
-            Vertical radius of influence (m)
-        
-        Returns
-        -------
-        None
-
-        """
-
-        print("sfc_cld_forward_operator.add_clear_obs_model() is deprecated!" + 
-              "Try using sfc_cld_forward_operator.add_clear_obs_model() instead.")
-
-        # Check whether ob_cld_amt is defined
-        try: 
-            self.data['ob_cld_amt']
-            amt_field = 'ob_cld_amt'
-        except KeyError:
-            amt_field = 'CLAM'
-
-        for i in self.data['idx']:
-            bin_cld = self.data['model_col_TCDC_P0_L105_GLC0'][i] > 0.1
-
-            if ~np.isclose(self.data['CLAM'][i][0], 0):
-                # At least one cloudy ob
-                for j, (zob, amtob) in enumerate(zip(self.data['HOCB'][i], self.data['CLAM'][i])):
-                    # Ignore model clouds within vert_roi of cloud ob
-                    bin_cld[np.logical_and(self.data['model_col_height_agl'][i] >= (zob - vert_roi),
-                                           self.data['model_col_height_agl'][i] <= (zob + vert_roi))] = 0
-                    if (np.isclose(amtob, 8) or j == 3):
-                        # No obs above an overcast ob
-                        # Also cannot have > 3 obs, so if this is the highest ob, ignore any other model clouds
-                        bin_cld[self.data['model_col_height_agl'][i] > zob] = 0
-
-            # Add clear obs
-            if np.sum(bin_cld) > 0:
-                label_cld, nlabel = sn.label(bin_cld)
-                for j in range(1, nlabel+1):
-                    self.data['HOCB'][i] = np.concatenate([self.data['HOCB'][i], 
-                                                           np.array([np.mean(self.data['model_col_height_agl'][i][label_cld == j])])])
-                    self.data[amt_field][i] = np.concatenate([self.data[amt_field][i], np.array([0])])
 
 
     def add_clear_obs(self, clr_ob_locs=np.arange(250, 3500, 500), terminate_clr_col=[8]):
@@ -479,7 +394,7 @@ class sfc_cld_forward_operator():
 
         self.data['hofx'] = []
         for i in self.data['idx']:
-            interp_fct = si.interp1d(self.data['model_col_height_agl'][i], 
+            interp_fct = si.interp1d(self.data['model_col_hgt'][i], 
                                      self.data['model_col_TCDC_P0_L105_GLC0'][i], 
                                      kind=method,
                                      bounds_error=False,
@@ -622,7 +537,7 @@ def remove_missing_cld_ob(bufr_df):
     return bufr_df
 
 
-def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1, 
+def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1, cld_field='cldfrac',
                            interp_col_kw={}, hgt_lim_kw={}, min_frac_kw={}, clr_ob_kw={},
                            interp_z_kw={}):
     """
@@ -638,6 +553,8 @@ def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1,
         Debug level. Increase for more debugging output
     verbose : integer, optional
         Verbosity. Increase for more general output
+    cld_field : string, optional
+        Name of cloud fraction field
     interp_col_kw : dictionary, optional
         Keyword arguments passed to sfc_cld_forward_operator.interp_model_col_to_ob()
     hgt_lim_kw : dictionary, optional
@@ -657,16 +574,16 @@ def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1,
     """
 
     if verbose > 0: print('Creating ceilometer forward operator object')
-    cld_hofx = sfc_cld_forward_operator(cld_ob_df, model_ds, debug=debug)
+    cld_hofx = sfc_cld_forward_operator(cld_ob_df, model_ds, cld_field=cld_field, debug=debug)
 
     if verbose > 0: print('Interpolating model columns to obs locations...')
-    cld_hofx.interp_model_col_to_ob(**interp_col_kw)
+    cld_hofx.interp_model_col_to_ob(fields=[cld_field, 'hgt'], **interp_col_kw)
 
     if verbose > 0: print('Imposing height limits and min cld fraction...')
-    cld_hofx.impose_hgt_limits(hgt_field='model_col_height_agl',
-                               fields=['model_col_height_agl', 'model_col_TCDC_P0_L105_GLC0', 'model_zgrid'],
+    cld_hofx.impose_hgt_limits(hgt_field='model_col_hgt',
+                               fields=['model_col_hgt', f'model_col_{cld_field}', 'model_zgrid'],
                                **hgt_lim_kw)
-    cld_hofx.impose_min_cld_frac(**min_frac_kw)
+    cld_hofx.impose_min_cld_frac(field='model_col_cldfrac', **min_frac_kw)
 
     # Set clear obs to have HOCB = 50 m so they don't get removed
     for i in cld_hofx.data['idx']:
@@ -688,43 +605,7 @@ def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1,
     if verbose > 0: print('Interpolating ob heights to model coordinates (needed if localization is desired)')
     cld_hofx.interp_ob_hgt_to_model_grid()
 
-    return cld_hofx
-    
-
-if __name__ == '__main__':
-
-    start = dt.datetime.now()
-    print(f'start time: {start.strftime("%Y%m%d %H:%M:%S")}')
-    print()
-
-    print('reading in BUFR obs...')
-    bufr_obj = bufr.bufrCSV(sys.argv[1])
-
-    print('reading in model UPP output...')
-    model_ds = xr.open_dataset(sys.argv[2], engine='pynio')
-
-    print('Identifying cloud obs...')
-    cld_ob_df = find_bufr_cloud_obs(bufr_obj)
-
-    print('Running ceilometer forward operator...')
-    cld_hofx = ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, hgt_lim_kw={'max_hgt':3500})
-
-    print()
-    cld_hofx.compute_OmB()
-    print(f"O-B RMSD = {cld_hofx.compute_global_RMS(field='OmB')}")
-
-    if len(sys.argv) > 3:
-        if sys.argv[3]:
-            print()
-            print('Making plots...')
-            cld_hofx_viz = cfov.sfc_cld_forward_operator_viz(cld_hofx)
-            cld_hofx_viz.scatterplot()
-            plt.savefig('cld_amt_scatterplot.png')
-            cld_hofx_viz.hist(plot_param={'field':'OmB'})
-            plt.savefig('OmB_hist.png')
-
-    print()
-    print(f'Done! Elapsed time = {(dt.datetime.now() - start).total_seconds()} s')
+    return cld_hofx 
 
 
 """
