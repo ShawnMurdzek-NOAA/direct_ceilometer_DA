@@ -24,14 +24,14 @@ class TestObsIO():
     @pytest.fixture(scope='class')
     def full_obs(self):
         return oi.read_bufr_obs('./sample_data/bufr/2024052704.rap.t04z.prepbufr.csv',
-                                subset=None,
-                                domain=None)
+                                subset=[],
+                                domain=[])
 
 
     def test_read_bufr_obs_subset(self, full_obs):
         df = oi.read_bufr_obs('./sample_data/bufr/2024052704.rap.t04z.prepbufr.csv',
                               subset=['ADPSFC'],
-                              domain=None)
+                              domain=[])
         
         assert len(full_obs) > len(df)
         assert df['subset'].unique() == ['ADPSFC']
@@ -40,7 +40,7 @@ class TestObsIO():
     def test_read_bufr_obs_domain(self, full_obs):
         domain = [40, -125, 50, -100]
         df = oi.read_bufr_obs('./sample_data/bufr/2024052704.rap.t04z.prepbufr.csv',
-                              subset=None,
+                              subset=[],
                               domain=domain)
         
         assert len(full_obs) > len(df)

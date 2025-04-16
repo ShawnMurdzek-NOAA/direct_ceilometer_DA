@@ -2,11 +2,7 @@
 #--------------------------------------------
 
 # UPP output for each ensemble member
-str_format: '/gpfs/f6/bil-pmp/scratch/Shawn.S.Murdzek/RRFS_Ens_Cloud_DA/Feb2022_retro/Ens_GDAS_SDLVDL_noGF_cloud1/v0.6.2/prod/rrfs_conus_3km_ensda.20220201/20/mem{num:04d}/rrfs.t20z.{lev}.f001.conus_3km.grib2'
-prslev_vars:
-  - 'HGT_P0_L215_GLC0'
-  - 'CEIL_P0_L215_GLC0'
-  - 'CEIL_P0_L2_GLC0'
+str_format: '/gpfs/f6/pmp/scratch/Shawn.S.Murdzek/RRFS_Ens_Cloud_DA/Feb2022_retro/Ens_GDAS_SDLVDL_noGF_cloud1/v0.6.2/prod/rrfs_conus_3km_ensda.20220201/20/mem{num:04d}/rrfs.t20z.natlev.f001.conus_3km.grib2'
 nmem: 3
 
 # Option to save output to a netCDF file
@@ -66,7 +62,7 @@ state_vars:
 
 # Tag to add to output files and output file directory
 save_tag: 'S_NewEngland_2022020121_EnKF_test'
-out_dir: '{TEST_DIR}/test_out' 
+out_dir: '{TEST_DIR}/test_localize_out'
 
 # Option to perform DA. Set to False to only plot background fields
 # If only plotting background fields, it helps to set plot_stat_config/plot_bgd_once to True
@@ -104,7 +100,7 @@ hofx_kw:
 # Localization options
 # lh is in km, lv is in model vertical levels
 localization:
-  use: False
+  use: True
   lh: 50
   lv: 4
 
