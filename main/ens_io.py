@@ -52,7 +52,7 @@ class ens_data():
         self.meta['Nx'], self.meta['Nens'] = np.shape(state)
 
         # Determine N2d and Nz
-        self.meta['N2d'], self.meta['Nz'] = np.shape(self.loc['lat'])
+        self.meta['N2d'], self.meta['Nz'] = np.shape(self.loc['hgt'])
 
         # Save unique forecast variable names
         self.meta['Nvars'] = len(varnames)
@@ -101,16 +101,16 @@ def read_parse_mpas(fnames,
     Nens = len(fnames)
     state = np.zeros((N3d * len(state_fields), Nens))
     other = {}
-    for f in other_fields:
-        other[f] = []
+    for key in other_fields.keys():
+        other[other_fields[key]] = []
     for i, f in enumerate(fnames):
         ds = xr.open_dataset(f)
         idx = 0
         for v in state_fields:
-            state[idx:(idx+N3d), i] = np.flatten(ds[v].values)
+            state[idx:(idx+N3d), i] = np.ravel(ds[v].values)
             idx = idx + N3d
         for key in other_fields.keys():
-            other[other_fields[key]].append(np.flatten(ds[key].values))
+            other[other_fields[key]].append(np.ravel(ds[key].values))
     
     # Convert other output into arrays
     for key in other_fields.keys():
@@ -150,11 +150,11 @@ def read_parse_upp(fnames,
     if verbose > 0: print('Reading UPP grid information')
     fix_ds = xr.open_dataset(fnames[0], engine='pynio')
     shape_3d = fix_ds['HGT_P0_L105_GLC0'].shape
-    loc = {'lat': np.flatten(fix_ds['gridlat_0'].values),
-           'lon': np.flatten(fix_ds['gridlon_0'].values),
+    loc = {'lat': np.ravel(fix_ds['gridlat_0'].values),
+           'lon': np.ravel(fix_ds['gridlon_0'].values),
            'hgt': np.reshape(fix_ds['HGT_P0_L105_GLC0'].values - 
                              fix_ds['HGT_P0_L1_GLC0'].values[np.newaxis, :, :], 
-                             shape=(shape_3d[1] * shape_3d[2], shape_3d[0]))}
+                             newshape=(shape_3d[1] * shape_3d[2], shape_3d[0]))}
 
     # Read in ensemble data
     if verbose > 0: print('Reading UPP atmospheric information')
@@ -162,16 +162,16 @@ def read_parse_upp(fnames,
     Nens = len(fnames)
     state = np.zeros((N3d * len(state_fields), Nens))
     other = {}
-    for f in other_fields:
-        other[f] = []
+    for key in other_fields.keys():
+        other[other_fields[key]] = []
     for i, f in enumerate(fnames):
-        ds = xr.open_dataset(f)
+        ds = xr.open_dataset(f, engine='pynio')
         idx = 0
         for v in state_fields:
-            state[idx:(idx+N3d), i] = np.flatten(ds[v].values)
+            state[idx:(idx+N3d), i] = np.ravel(ds[v].values)
             idx = idx + N3d
         for key in other_fields.keys():
-            other[other_fields[key]].append(np.flatten(ds[key].values))
+            other[other_fields[key]].append(np.ravel(ds[key].values))
     
     # Convert other output into arrays
     for key in other_fields.keys():
