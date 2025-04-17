@@ -12,7 +12,7 @@ import pytest
 import xarray as xr
 import numpy as np
 
-import direct_ceilometer_DA.main.ens_io as ei
+from direct_ceilometer_DA.main import ens_io
 
 
 #---------------------------------------------------------------------------------------------------
@@ -28,7 +28,7 @@ class TestEnsMPASIO():
         other_fields = {'qc' : 'cld_mass_mix'}
         fix_fname = './sample_data/mpas/invariant_TEST.nc'
         ftype = 'mpas'
-        return ei.read_ens(fnames, 
+        return ens_io.read_ens(fnames, 
                            state_fields=state_fields,
                            other_fields=other_fields,
                            fix_fname=fix_fname,
@@ -77,10 +77,10 @@ class TestEnsUPPIO():
         state_fields = ['TMP_P0_L105_GLC0', 'SPFH_P0_L105_GLC0', 'FRACCC_P0_L105_GLC0']
         other_fields = {'TKE_P0_L105_GLC0' : 'TKE'}
         ftype = 'upp'
-        return ei.read_ens(fnames, 
-                           state_fields=state_fields,
-                           other_fields=other_fields,
-                           ftype=ftype)
+        return ens_io.read_ens(fnames, 
+                               state_fields=state_fields,
+                               other_fields=other_fields,
+                               ftype=ftype)
     
 
     def test_ens_contents(self, sample):

@@ -150,7 +150,8 @@ def run_cld_forward_operator(ens_obj, cld_ob_df, hofx_kw={}, cld_field='cld_frac
     for n in range(ens_obj.meta['Nens']):
         if verbose: print(f'Running forward operator on ensemble member {n+1}')
         model_dict = ens_obj.var_dict(n)
-        cld_hofx[n] = cfo.ceilometer_hofx_driver(cld_ob_df, model_dict, **hofx_kw)
+        cld_hofx[n] = cfo.ceilometer_hofx_driver(cld_ob_df, model_dict, cld_field=cld_field, 
+                                                 **hofx_kw)
     
     return cld_hofx
 

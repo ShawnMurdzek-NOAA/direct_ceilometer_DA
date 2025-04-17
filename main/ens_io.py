@@ -80,17 +80,14 @@ class ens_data():
         N3d = N2d * Nz
 
         # State variables
-        print(N2d)
         for i, v in enumerate(self.varnames):
             out_dict[v] = np.reshape(self.state[(N3d*i):(N3d*(i+1)), n], newshape=(N2d, Nz))
 
         # Locations
-        print(N2d)
         for key in self.loc.keys():
             out_dict[key] = self.loc[key]
 
         # Other variables
-        print(N2d)
         for key in self.other.keys():
             out_dict[key] = np.reshape(self.other[key][:, n], newshape=(N2d, Nz))
 
@@ -131,7 +128,7 @@ def read_parse_mpas(fnames,
     if verbose > 0: print('Reading MPAS mesh information')
     fix_ds = xr.open_dataset(fix_fname)
     loc = {'lat': np.rad2deg(fix_ds['latCell'].values),
-           'lon': np.rad2deg(fix_ds['lonCell'].values),
+           'lon': np.rad2deg(fix_ds['lonCell'].values) - 360,
            'hgt': (0.5*(fix_ds['zgrid'][:, 1:] + fix_ds['zgrid'][:, :-1]) - fix_ds['ter']).values}
 
     # Read in ensemble data

@@ -104,14 +104,14 @@ class sfc_cld_forward_operator():
                     self.data['ob_cld_precision'][i][j] = 25.
                 elif np.isclose( self.data['CLAM'][i][j], 12):
                     self.data['ob_cld_amt'][i][j] = 75.
-                    self.data['ob_cld_precision'][i][j] = 0.25
+                    self.data['ob_cld_precision'][i][j] = 25
                 elif np.isclose( self.data['CLAM'][i][j], 13):
                     self.data['ob_cld_amt'][i][j] = 12.5
                     self.data['ob_cld_precision'][i][j] = 25.
 
 
     def interp_model_col_to_ob(self, method='nearest', proj_str='+proj=lcc +lat_0=39 +lon_0=-96 +lat_1=33 +lat_2=45',
-                               fields=['cldfrac', 'hgt'], zgrid='lv_HYBL2'):
+                               fields=['cldfrac', 'hgt']):
         """
         Wrapper method for interpolation of model vertical columns to ceilometer (lat, lon) locations
 
@@ -144,7 +144,7 @@ class sfc_cld_forward_operator():
             print(f'method {method} is not supported')
 
         # Add vertical grid levels
-        self.data['model_zgrid'] = [self.model_ds[zgrid].values] * len(self.data['idx'])
+        self.data['model_zgrid'] = [list(range(self.model_dict[fields[0]].shape[1]))] * len(self.data['idx'])
         
         if self.debug > 0:
             print('sfc_cld_forward_operator: Finished interpolating model output columns ' +
@@ -177,7 +177,7 @@ class sfc_cld_forward_operator():
         self.model_dict['x_proj'], self.model_dict['y_proj'] = self.proj(self.model_dict['lon'], self.model_dict['lat'])
     
 
-    def _model_nearest_interp_col(self, fields=['TCDC_P0_L105_GLC0', 'hgt']):
+    def _model_nearest_interp_col(self, fields=['cldfrac', 'hgt']):
         """
         Use nearest neighbor interpolation to interpolate model columns to obs (lat, lon) locations
 
@@ -203,7 +203,7 @@ class sfc_cld_forward_operator():
     
 
     def impose_hgt_limits(self, min_hgt=10, max_hgt=3658, hgt_field='model_col_hgt',
-                          fields=['model_col_hgt', 'model_col_TCDC_P0_L105_GLC0', 'model_zgrid']):
+                          fields=['model_col_hgt', 'model_col_cldfrac', 'model_zgrid']):
         """
         Impose min and max height limits to either the model or obs
 
@@ -230,7 +230,7 @@ class sfc_cld_forward_operator():
             # Should correspond to the min/max ceilometer vertical range
             cond_hgt = np.logical_and(self.data[hgt_field][i] >= min_hgt, self.data[hgt_field][i] <= max_hgt)
             for f in fields:
-                self.data[f][i] = self.data[f][i][cond_hgt]
+                self.data[f][i] = np.array(self.data[f][i])[cond_hgt]
     
 
     def impose_min_cld_frac(self, min_cld_frac=5, field='model_col_cldfrac'):
@@ -375,7 +375,7 @@ class sfc_cld_forward_operator():
                     print(f'data[amt_field][i] = {self.data[amt_field][i]}')
 
 
-    def interp_model_to_obs(self, method='nearest', match_precision=True):
+    def interp_model_to_obs(self, method='nearest', match_precision=True, field='model_col_cldfrac'):
         """
         Perform interpolation within a model column to the observed cloud locations
 
@@ -385,6 +385,8 @@ class sfc_cld_forward_operator():
             Interpolation method. Passed to si.interp1d
         match_precision : boolean, optional
             Option to have the interpolated cloud fraction match the precision of the obs
+        field : string, optional
+            Field to interpolate
         
         Returns
         -------
@@ -395,7 +397,7 @@ class sfc_cld_forward_operator():
         self.data['hofx'] = []
         for i in self.data['idx']:
             interp_fct = si.interp1d(self.data['model_col_hgt'][i], 
-                                     self.data['model_col_TCDC_P0_L105_GLC0'][i], 
+                                     self.data[field][i], 
                                      kind=method,
                                      bounds_error=False,
                                      fill_value="extrapolate")  # Not sure if "extrapolate" will have undesirable results...
@@ -537,7 +539,7 @@ def remove_missing_cld_ob(bufr_df):
     return bufr_df
 
 
-def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1, cld_field='cldfrac',
+def ceilometer_hofx_driver(cld_ob_df, model_dict, debug=0, verbose=1, cld_field='cldfrac',
                            interp_col_kw={}, hgt_lim_kw={}, min_frac_kw={}, clr_ob_kw={},
                            interp_z_kw={}):
     """
@@ -547,7 +549,7 @@ def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1, cld_field='c
     ----------
     cld_ob_df : pd.DataFrame
         Ceilometer cloud obs
-    model_ds : xr.Dataset
+    model_dict : dictionary
         Background model data
     debug : integer, optional
         Debug level. Increase for more debugging output
@@ -574,7 +576,7 @@ def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1, cld_field='c
     """
 
     if verbose > 0: print('Creating ceilometer forward operator object')
-    cld_hofx = sfc_cld_forward_operator(cld_ob_df, model_ds, cld_field=cld_field, debug=debug)
+    cld_hofx = sfc_cld_forward_operator(cld_ob_df, model_dict, cld_field=cld_field, debug=debug)
 
     if verbose > 0: print('Interpolating model columns to obs locations...')
     cld_hofx.interp_model_col_to_ob(fields=[cld_field, 'hgt'], **interp_col_kw)
@@ -583,7 +585,7 @@ def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1, cld_field='c
     cld_hofx.impose_hgt_limits(hgt_field='model_col_hgt',
                                fields=['model_col_hgt', f'model_col_{cld_field}', 'model_zgrid'],
                                **hgt_lim_kw)
-    cld_hofx.impose_min_cld_frac(field='model_col_cldfrac', **min_frac_kw)
+    cld_hofx.impose_min_cld_frac(field=f'model_col_{cld_field}', **min_frac_kw)
 
     # Set clear obs to have HOCB = 50 m so they don't get removed
     for i in cld_hofx.data['idx']:
@@ -600,7 +602,7 @@ def ceilometer_hofx_driver(cld_ob_df, model_ds, debug=0, verbose=1, cld_field='c
     if verbose > 0: print('Adding clear obs and interpolating model clouds in column to ob heights...')
     cld_hofx.add_clear_obs(**clr_ob_kw)
     cld_hofx.decode_ob_clam()
-    cld_hofx.interp_model_to_obs(**interp_z_kw)
+    cld_hofx.interp_model_to_obs(field=f'model_col_{cld_field}', **interp_z_kw)
 
     if verbose > 0: print('Interpolating ob heights to model coordinates (needed if localization is desired)')
     cld_hofx.interp_ob_hgt_to_model_grid()
