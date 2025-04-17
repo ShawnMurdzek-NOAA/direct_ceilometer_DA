@@ -20,6 +20,7 @@ obs:
 
 # DA settings
 DA:
+  perform_da: True
   state_vars: ['theta', 'qv', 'cldfrac']
   ob_var: 156.25
   hofx_kw:

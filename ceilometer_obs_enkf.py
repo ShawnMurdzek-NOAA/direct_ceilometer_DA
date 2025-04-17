@@ -71,6 +71,9 @@ def read_ensemble(param):
 
     """
 
+    if param['ens']['type']:
+        print('\nWarning: UPP output has not been extensively tested yet\n')
+
     fnames = [param['ens']['path'].format(num=n) for n in range(1, param['nmem'] + 1)]
     ens_obj = ens_io.read_ens(fnames,
                               state_fields=param['DA']['state_vars'],
@@ -120,7 +123,7 @@ def read_obs(param):
     return obs_df
 
 
-def run_cld_forward_operator(ens_obj, cld_ob_df, hofx_kw={}, cld_field='cld_frac', verbose=False):
+def run_cld_forward_operator(ens_obj, cld_ob_df, hofx_kw={}, verbose=0, Nens=0):
     """
     Run the cloud DA forward operator for all observations in the subset domain
 
@@ -132,10 +135,11 @@ def run_cld_forward_operator(ens_obj, cld_ob_df, hofx_kw={}, cld_field='cld_frac
         Ceilometer observations used in the forward operator
     hofx_kw : dictionary, optional
         Keyword arguments passed to cfo.ceilometer_hofx_driver()
-    cld_field : string, optional
-        Name of cloud fraction field
-    verbose : boolean, optional
+    verbose : integer, optional
         Option to print extra output
+    Nens : integer, optional
+        Option to only run forward operator on the first Nens ensemble members. Set to 0 to run on
+        all ensemble members
     
     Returns
     -------
@@ -144,14 +148,14 @@ def run_cld_forward_operator(ens_obj, cld_ob_df, hofx_kw={}, cld_field='cld_frac
 
     """
     
-    cld_hofx = {}
+    cld_hofx = []
 
     # Run forward operator
-    for n in range(ens_obj.meta['Nens']):
-        if verbose: print(f'Running forward operator on ensemble member {n+1}')
+    if Nens == 0: Nens = ens_obj.meta['Nens']
+    for n in range(Nens):
+        if verbose > 0: print(f'Running forward operator on ensemble member {n+1}')
         model_dict = ens_obj.var_dict(n)
-        cld_hofx[n] = cfo.ceilometer_hofx_driver(cld_ob_df, model_dict, cld_field=cld_field, 
-                                                 **hofx_kw)
+        cld_hofx.append(cfo.ceilometer_hofx_driver(cld_ob_df, model_dict, **hofx_kw))
     
     return cld_hofx
 
@@ -162,7 +166,7 @@ def compute_localization_array(ens_obj, param, z, lon, lat):
 
     Parameters
     ----------
-    ens_obj : pyDA_utils.ensemble_utils.ensemble object
+    ens_obj : ens_io.ens_data object
         Ensemble output
     param : dictionary
         YAML inputs
@@ -184,7 +188,7 @@ def compute_localization_array(ens_obj, param, z, lon, lat):
     local_fct = local.localization_fct(local.gaspari_cohn_5ord)
 
     # Extract information needed to compute localization
-    model_pts = ens_obj.state_matrix['loc']
+    model_pts = np.array([ens_obj.loc['z'], ens_obj.loc['lat'], ens_obj.loc['lon']])
     ob_pt = np.array([z, lat, lon])
     lh = param['localization']['lh']
     lv = param['localization']['lv']
@@ -195,41 +199,7 @@ def compute_localization_array(ens_obj, param, z, lon, lat):
     return C
 
 
-def unravel_state_matrix(x, ens_obj, ens_dim=True):
-    """
-    Unravel state matrix from ens_obj so fields can be plotted
-
-    Parameters
-    ----------
-    x : array
-        State matrix. Dimensions (M, N), where M is the (number of gridpoints) X (number of fields)
-        and N is the number of ensemble members
-    ens_obj : pyDA_utils.ensemble_utils.ensemble object
-        Ensemble output
-    ens_dim : boolean, optional
-        Option to also unravel the ensemble dimension. Set to False if x is 1D
-    
-    Returns
-    -------
-    output : dictionary
-        Unraveled state matrix. Keys are the different fields, and each field is now 3D
-    
-    """
-
-    output = {}
-    for v in np.unique(ens_obj.state_matrix['vars']):
-        var_cond = ens_obj.state_matrix['vars'] == v
-        if ens_dim:
-            output[v] = {}
-            for i, ens in enumerate(ens_obj.mem_names):
-                output[v][ens] = np.reshape(x[var_cond, i], ens_obj.subset_ds[ens][v].shape)
-        else:
-            output[v] = np.reshape(x[var_cond], ens_obj.subset_ds[ens_obj.mem_names[0]][v].shape)
-
-    return output
-
-
-def run_enkf(ens_obj, ob_df, param, verbose=0):
+def run_enkf(ens_obj, ob_df, param):
     """
     Run EnKF for an arbitrary number of observations
 
@@ -241,90 +211,72 @@ def run_enkf(ens_obj, ob_df, param, verbose=0):
         Ceilometer observations
     param : dictionary
         Input YAML parameters
-    verbose : int, optional
-        Verbosity level
 
     Returns
     -------
     ens_obj : ens_io.ens_data object
         Ensemble output
-    cld_ob_coord : list
-        Observed cloud coordinates in model space. Dimensions: (z, lon, lat)
         
     """
 
     start_enkf = dt.datetime.now()
     cld_ob_coord = []
 
-    # Apply cloud DA forward operator on first ensemble member to get locations of clear obs
-    m1 = ens_obj.mem_names[0]
-    cld_hofx_ref = run_cld_forward_operator(ens_obj, ob_df, ens_name=[m1], hofx_kw=param['hofx_kw'])
-
-    # Apply cloud DA forward operator if only needed once
-    if (not param['redo_hofx']) or (not param['perform_da']):
-        cld_hofx = run_cld_forward_operator(ens_obj, ob_df, ens_name=ens_obj.mem_names, hofx_kw=param['hofx_kw'])
-        if verbose > 0: print(f"Time to complete forward operator for all members and obs = {(dt.datetime.now() - start_enkf).total_seconds()} s")
+    # Apply cloud DA forward operator
+    cld_hofx = run_cld_forward_operator(ens_obj, ob_df, hofx_kw=param['DA']['hofx_kw'], 
+                                        verbose=param['DA']['verbose'], Nens=0)
+    if param['DA']['verbose'] > 0: print(f"Time to complete forward operator for all members and obs = {(dt.datetime.now() - start_enkf).total_seconds()} s")
 
     # Loop over each observation
-    if param['ob_sel'][da_exp] == 'entire_file':
-        ob_sids = cld_hofx_ref[m1].data['SID']
+    if param['obs']['entire_file']:
+        ob_sids = cld_hofx[0].data['SID']
     else:
-        ob_sids = list(param['ob_sel'][da_exp].keys())
+        ob_sids = list(param['obs']['ob_sel'].keys())
     for i, s in enumerate(ob_sids):
-        if param['ob_sel'][da_exp] == 'entire_file':
-            ob_idx = list(range(len(cld_hofx_ref[m1].data['HOCB'][i])))
+        if param['obs']['entire_file']:
+            ob_idx = list(range(len(cld_hofx[0].data['HOCB'][i])))
         else:
-            ob_idx = param['ob_sel'][da_exp][s]
+            ob_idx = param['obs']['ob_sel'][s]
         for j in ob_idx:
             start_loop = dt.datetime.now()
-            if verbose > 1: print(f"  Looping over ob {s} {j}")
+            if param['DA']['verbose'] > 1: print(f"  Looping over ob {s} {j}")
 
-            # Run forward operator
-            if (param['redo_hofx']) and (param['perform_da']):
-                dum = ob_df.loc[ob_df['SID'] == s, :]
-                cld_hofx = run_cld_forward_operator(ens_obj, dum, ens_name=ens_obj.mem_names, hofx_kw=param['hofx_kw'])
-                idx1 = 0
-            else:
-                idx1 = np.where(np.array(cld_hofx[m1].data['SID']) == s)[0][0]
+            idx1 = np.where(np.array(cld_hofx[0].data['SID']) == s)[0][0]
 
             # Extract cloud amount, H(x), and location
             hofx = np.zeros(len(cld_hofx))
-            cld_ob_coord.append([0, cld_hofx[m1].data['lon'][idx1], cld_hofx[m1].data['lat'][idx1]])
-            for k, mem in enumerate(ens_obj.mem_names):
-                hofx[k] = cld_hofx[mem].data['hofx'][idx1][j]
-                cld_ob_coord[-1][0] = cld_ob_coord[-1][0] + cld_hofx[mem].data['ob_hgt_model'][idx1][j]
-            cld_ob_coord[-1][0] = cld_ob_coord[-1][0] / len(ens_obj.mem_names)
-            cld_amt = cld_hofx[mem].data['ob_cld_amt'][idx1][j]
+            cld_ob_coord.append([0, cld_hofx[0].data['lon'][idx1], cld_hofx[0].data['lat'][idx1]])
+            for k in range(ens_obj.meta['Nens']):
+                hofx[k] = cld_hofx[k].data['hofx'][idx1][j]
+                cld_ob_coord[-1][0] = cld_ob_coord[-1][0] + cld_hofx[k].data['ob_hgt_model'][idx1][j]
+            cld_ob_coord[-1][0] = cld_ob_coord[-1][0] / ens_obj.meta['Nens']
+            cld_amt = cld_hofx[0].data['ob_cld_amt'][idx1][j]
 
             # Skip remaining steps if not performing DA
-            if not param['perform_da']:
+            if not param['DA']['perform_da']:
                 continue
             
             # Compute localization
-            if param['localization']['use']:
+            if param['DA']['localization']['use']:
                 start_local = dt.datetime.now()
-                if verbose > 2: print(f"  computing localization with lh = {param['localization']['lh']}, lv = {param['localization']['lv']}")
+                if param['DA']['verbose'] > 2: print(f"  computing localization with lh = {param['DA']['localization']['lh']}, lv = {param['DA']['localization']['lv']}")
                 C_local = compute_localization_array(ens_obj, param, cld_ob_coord[-1][0], cld_ob_coord[-1][1], cld_ob_coord[-1][2])
-                if verbose > 0: print(f"  Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
+                if param['DA']['verbose'] > 0: print(f"  Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
             else:
                 C_local = None
 
             # Run EnKF
-            enkf_obj = enkf.enkf_1ob(ens_obj.state_matrix['data'], cld_amt, hofx, param['ob_var'], localize=C_local)
+            enkf_obj = enkf.enkf_1ob(ens_obj.state, cld_amt, hofx, param['DA']['ob_var'], localize=C_local)
             enkf_obj.EnSRF()
 
             # Update ens_obj with the new analysis
-            xa_nd = unravel_state_matrix(enkf_obj.x_a, ens_obj)
-            for v in xa_nd.keys():
-                for ens in xa_nd[v].keys():
-                    ens_obj.subset_ds[ens][v].values = xa_nd[v][ens]
-            ens_obj.state_matrix['data'] = enkf_obj.x_a
+            ens_obj.state = enkf_obj.x_a
 
-            if verbose > 0: print(f"  Time to assimilate {s} {j} = {(dt.datetime.now() - start_loop).total_seconds()} s")
+            if param['DA']['verbose'] > 0: print(f"  Time to assimilate {s} {j} = {(dt.datetime.now() - start_loop).total_seconds()} s")
 
-    if verbose > 0: print(f"run_enkf.py total time = {(dt.datetime.now() - start_enkf).total_seconds()} s")
+    if param['DA']['verbose'] > 0: print(f"run_enkf total time = {(dt.datetime.now() - start_enkf).total_seconds()} s")
 
-    return ens_obj, np.array(cld_ob_coord)
+    return ens_obj
 
 
 if __name__ == '__main__':
@@ -344,8 +296,7 @@ if __name__ == '__main__':
 
     # Run EnKF
     print('\nRunning EnKF')
-    ens_obj, ob_coord_all = run_enkf(ens_obj, cld_ob_df, param, verbose=param['DA']['verbose'])
-    ens_obj = ens_post.post_enkf(ens_obj, param, DA=param['perform_da'])
+    ens_obj = run_enkf(ens_obj, cld_ob_df, param)
     
     print(f'\ntotal elapsed time = {(dt.datetime.now() - start).total_seconds()} s')
 
