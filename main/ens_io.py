@@ -94,6 +94,31 @@ class ens_data():
         return out_dict
     
 
+    def write_mpas_out_for_DA(self, in_fnames, out_fnames):
+        """
+        Write ensemble output to an MPAS netCDF file
+
+        Parameters
+        ----------
+        in_fnames : list
+            List of input MPAS file names. Dimensions: (Nens)
+        out_fnames : list
+            List of output MPAS file names. Dimensions: (Nens)
+        
+        Returns
+        -------
+        None
+
+        """
+
+        for i, (in_f, out_f) in enumerate(zip(in_fnames, out_fnames)):
+            ds = xr.open_dataset(in_f)
+            model_dict = self.var_dict(i)
+            for v in self.varnames:
+                ds[v].values = np.expand_dims(model_dict[v], axis=0)
+            ds.to_netcdf(out_f)
+    
+
 def read_parse_mpas(fnames, 
                     fix_fname, 
                     state_fields=['theta', 'qv', 'cldfrac'], 

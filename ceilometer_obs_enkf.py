@@ -74,7 +74,7 @@ def read_ensemble(param):
     if param['ens']['type']:
         print('\nWarning: UPP output has not been extensively tested yet\n')
 
-    fnames = [param['ens']['path'].format(num=n) for n in range(1, param['nmem'] + 1)]
+    fnames = [param['ens']['in_path'].format(num=n) for n in range(1, param['nmem'] + 1)]
     ens_obj = ens_io.read_ens(fnames,
                               state_fields=param['DA']['state_vars'],
                               other_fields={},
@@ -279,6 +279,29 @@ def run_enkf(ens_obj, ob_df, param):
     return ens_obj
 
 
+def save_ens(ens_obj, param):
+    """
+    Save output form EnKF to a netCDF file
+
+    Parameters
+    ----------
+    ens_obj : ens_io.ens_data object
+        Ensemble data after performing EnKF
+    param : dictionary
+        Input parameters
+    
+    Returns
+    -------
+    None
+
+    """
+
+    in_fnames = [param['ens']['in_path'].format(num=n) for n in range(1, param['nmem'] + 1)]
+    out_fnames = [param['ens']['out_path'].format(num=n) for n in range(1, param['nmem'] + 1)]
+
+    ens_obj.write_mpas_out_for_DA(in_fnames, out_fnames)
+
+
 if __name__ == '__main__':
 
     start = dt.datetime.now()
@@ -297,6 +320,10 @@ if __name__ == '__main__':
     # Run EnKF
     print('\nRunning EnKF')
     ens_obj = run_enkf(ens_obj, cld_ob_df, param)
+
+    # Save output
+    print('\nWriting output to netCDF file')
+    save_ens(ens_obj, param)
     
     print(f'\ntotal elapsed time = {(dt.datetime.now() - start).total_seconds()} s')
 

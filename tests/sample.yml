@@ -2,9 +2,10 @@
 #--------------------------------------------
 
 # Ensemble Information
-# 'path' should include a {num} placeholder for ensemble member number
+# 'in_path' and 'out_path' should include a {num} placeholder for ensemble member number
 ens:
-  path: '/autofs/ncrc-svm1_home2/Shawn.S.Murdzek/src/direct_ceilometer_DA/tests/sample_data/mpas/mem{num:03d}/mpasout.2024-05-27_04.00.00.TEST.nc'
+  in_path: '/autofs/ncrc-svm1_home2/Shawn.S.Murdzek/src/direct_ceilometer_DA/tests/sample_data/mpas/mem{num:03d}/mpasout.2024-05-27_04.00.00.TEST.nc'
+  out_path: '/autofs/ncrc-svm1_home2/Shawn.S.Murdzek/src/direct_ceilometer_DA/tests/sample_data/mpas/mem{num:03d}/mpasout.DA.2024-05-27_04.00.00.TEST.nc'
   fix_file: '/autofs/ncrc-svm1_home2/Shawn.S.Murdzek/src/direct_ceilometer_DA/tests/sample_data/mpas/invariant_TEST.nc'
   type: 'mpas'
   verbose: 0

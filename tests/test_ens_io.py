@@ -11,6 +11,8 @@ shawn.s.murdzek@noaa.gov
 import pytest
 import xarray as xr
 import numpy as np
+import os
+import copy
 
 from direct_ceilometer_DA.main import ens_io
 
@@ -55,6 +57,7 @@ class TestEnsMPASIO():
         """
         Test the .var_dict() method using MPAS netCDF output
         """
+        sample = copy.deepcopy(sample)
 
         # Read in mesh info and netCDF output for a single member
         ds_info = xr.open_dataset('./sample_data/mpas/invariant_TEST.nc')
@@ -67,6 +70,31 @@ class TestEnsMPASIO():
         for f_origin, f_new in zip(['theta', 'qv', 'cldfrac', 'qc'],
                                    ['theta', 'qv', 'cldfrac', 'cld_mass_mix']):
             assert np.all(np.isclose(ds[f_origin].values, model_dict[f_new]))
+    
+
+    def test_write_mpas_out_for_DA(self, sample):
+        """
+        Test the .write_mpas_out_for_DA() method using MPAS netCDF output
+        """
+        sample = copy.deepcopy(sample)
+        in_fnames = [f'./sample_data/mpas/mem00{n}/mpasout.2024-05-27_04.00.00.TEST.nc' for n in range(1, 4)]
+        out_fnames = [f'./sample_data/mpas/mem00{n}/mpasout.DA.2024-05-27_04.00.00.TEST.nc' for n in range(1, 4)]
+
+        # Make some changes to data, then call method
+        sample.state = np.zeros(sample.state.shape)
+        sample.write_mpas_out_for_DA(in_fnames, out_fnames)
+
+        # Check to make sure output files exist
+        for f in out_fnames:
+            assert os.path.isfile(f)
+
+        # Check output from a sample file
+        ds = xr.open_dataset(out_fnames[0])
+        assert np.all(np.isclose(ds['theta'].values, 0))
+        
+        # Clean up
+        for f in out_fnames:
+            os.remove(f)
 
 
 class TestEnsUPPIO():
