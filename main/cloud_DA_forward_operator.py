@@ -338,6 +338,9 @@ class sfc_cld_forward_operator():
         except KeyError:
             amt_field = 'CLAM'
 
+        # Ensure clr_ob_locs is an array
+        clr_ob_locs = np.array(clr_ob_locs)
+
         if self.debug > 0:
             print()
             print('Inside sfc_cld_forward_operator.add_clear_obs()...')

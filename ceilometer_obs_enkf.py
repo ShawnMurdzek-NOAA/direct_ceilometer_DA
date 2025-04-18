@@ -9,22 +9,16 @@ shawn.s.murdzek@noaa.gov
 #---------------------------------------------------------------------------------------------------
 
 import sys
-import os
 import numpy as np
-import matplotlib.pyplot as plt
 import datetime as dt
-import metpy.calc as mc
-from metpy.units import units
 import copy
 import yaml
+import pandas as pd
 
 import main.cloud_DA_forward_operator as cfo
-import main.cloud_DA_enkf_postprocess as ens_post
 from main import ens_io
 from main import obs_io
 from pyDA_utils import enkf
-import pyDA_utils.ensemble_utils as eu
-from pyDA_utils import bufr
 import pyDA_utils.localization as local
 
 
@@ -71,10 +65,10 @@ def read_ensemble(param):
 
     """
 
-    if param['ens']['type']:
+    if (param['ens']['type'] == 'upp'):
         print('\nWarning: UPP output has not been extensively tested yet\n')
 
-    fnames = [param['ens']['in_path'].format(num=n) for n in range(1, param['nmem'] + 1)]
+    fnames = [param['ens']['in_path'].format(num=n) for n in range(1, param['ens']['nmem'] + 1)]
     ens_obj = ens_io.read_ens(fnames,
                               state_fields=param['DA']['state_vars'],
                               other_fields={},
@@ -105,6 +99,7 @@ def read_obs(param):
     bufr_df = obs_io.read_bufr_obs(param['obs']['fname'],
                                    subset=['ADPSFC', 'MSONET'],
                                    domain=param['obs']['domain'],
+                                   lim_DHR=param['obs']['lim_DHR'],
                                    verbose=param['obs']['verbose'])
     
     # Remove missing cloud obs
@@ -112,7 +107,7 @@ def read_obs(param):
 
     # Only retain obs from desired stations
     if not param['obs']['entire_file']:
-        SIDs = list(param['DA']['ob_sel'].keys())
+        SIDs = list(param['obs']['ob_sel'].keys())
         cond = np.zeros(len(obs_df))
         for s in SIDs:
             cond = cond + (obs_df['SID'] == s)
@@ -188,10 +183,16 @@ def compute_localization_array(ens_obj, param, z, lon, lat):
     local_fct = local.localization_fct(local.gaspari_cohn_5ord)
 
     # Extract information needed to compute localization
-    model_pts = np.array([ens_obj.loc['z'], ens_obj.loc['lat'], ens_obj.loc['lon']])
+    # Note that localization in the vertical uses the model vertical level (not height)
+    Nz = ens_obj.meta['Nz']
+    N2d = ens_obj.meta['N2d']
+    Nvar = ens_obj.meta['Nvars']
+    model_pts = np.array([list(np.ravel(np.repeat(np.arange(Nz)[np.newaxis, :], N2d, axis=0))) * Nvar, 
+                          list(np.ravel(np.repeat(ens_obj.loc['lat'][:, np.newaxis], Nz, axis=1))) * Nvar, 
+                          list(np.ravel(np.repeat(ens_obj.loc['lon'][:, np.newaxis], Nz, axis=1))) * Nvar]).T
     ob_pt = np.array([z, lat, lon])
-    lh = param['localization']['lh']
-    lv = param['localization']['lv']
+    lh = param['DA']['localization']['lh']
+    lv = param['DA']['localization']['lv']
 
     # Compute localization
     C = local_fct.compute_localization(model_pts, ob_pt, lv, lh)
@@ -216,11 +217,20 @@ def run_enkf(ens_obj, ob_df, param):
     -------
     ens_obj : ens_io.ens_data object
         Ensemble output
+    diag_df : pd.DataFrame
+        DA diagnostic data (e.g., ob, H(x), O-B, etc.)
         
     """
 
     start_enkf = dt.datetime.now()
-    cld_ob_coord = []
+
+    # Initialize dictionary for diagnostic output
+    diag = {}
+    for f in ['hgt', 'lon', 'lat', 'ob']:
+        diag[f] = []
+    for f in ['omb', 'oma']:
+        for k in range(ens_obj.meta['Nens']):
+            diag[f"{f}{k+1}"] = []
 
     # Apply cloud DA forward operator
     cld_hofx = run_cld_forward_operator(ens_obj, ob_df, hofx_kw=param['DA']['hofx_kw'], 
@@ -228,11 +238,7 @@ def run_enkf(ens_obj, ob_df, param):
     if param['DA']['verbose'] > 0: print(f"Time to complete forward operator for all members and obs = {(dt.datetime.now() - start_enkf).total_seconds()} s")
 
     # Loop over each observation
-    if param['obs']['entire_file']:
-        ob_sids = cld_hofx[0].data['SID']
-    else:
-        ob_sids = list(param['obs']['ob_sel'].keys())
-    for i, s in enumerate(ob_sids):
+    for i, s in enumerate(cld_hofx[0].data['SID']):
         if param['obs']['entire_file']:
             ob_idx = list(range(len(cld_hofx[0].data['HOCB'][i])))
         else:
@@ -241,16 +247,24 @@ def run_enkf(ens_obj, ob_df, param):
             start_loop = dt.datetime.now()
             if param['DA']['verbose'] > 1: print(f"  Looping over ob {s} {j}")
 
-            idx1 = np.where(np.array(cld_hofx[0].data['SID']) == s)[0][0]
-
             # Extract cloud amount, H(x), and location
-            hofx = np.zeros(len(cld_hofx))
-            cld_ob_coord.append([0, cld_hofx[0].data['lon'][idx1], cld_hofx[0].data['lat'][idx1]])
+            hofx = np.zeros(ens_obj.meta['Nens'])
+            cld_ob_coord = [0, cld_hofx[0].data['lon'][i], cld_hofx[0].data['lat'][i]]
             for k in range(ens_obj.meta['Nens']):
-                hofx[k] = cld_hofx[k].data['hofx'][idx1][j]
-                cld_ob_coord[-1][0] = cld_ob_coord[-1][0] + cld_hofx[k].data['ob_hgt_model'][idx1][j]
-            cld_ob_coord[-1][0] = cld_ob_coord[-1][0] / ens_obj.meta['Nens']
-            cld_amt = cld_hofx[0].data['ob_cld_amt'][idx1][j]
+                hofx[k] = cld_hofx[k].data['hofx'][i][j]
+                cld_ob_coord[0] = cld_ob_coord[0] + cld_hofx[k].data['ob_hgt_model'][i][j]
+            cld_ob_coord[0] = cld_ob_coord[0] / ens_obj.meta['Nens']
+            cld_amt = cld_hofx[0].data['ob_cld_amt'][i][j]
+
+            if param['DA']['verbose'] > 2: print("  H(x) =", hofx)
+
+            # Save diagnostic output
+            diag['hgt'].append(cld_hofx[0].data['HOCB'][i][j])    # Height in m rather than height in model vertical levels
+            diag['lon'].append(cld_ob_coord[1])
+            diag['lat'].append(cld_ob_coord[2])
+            diag['ob'].append(cld_amt)
+            for k in range(ens_obj.meta['Nens']):
+                diag[f"omb{k+1}"].append(cld_amt - hofx[k])
 
             # Skip remaining steps if not performing DA
             if not param['DA']['perform_da']:
@@ -260,7 +274,7 @@ def run_enkf(ens_obj, ob_df, param):
             if param['DA']['localization']['use']:
                 start_local = dt.datetime.now()
                 if param['DA']['verbose'] > 2: print(f"  computing localization with lh = {param['DA']['localization']['lh']}, lv = {param['DA']['localization']['lv']}")
-                C_local = compute_localization_array(ens_obj, param, cld_ob_coord[-1][0], cld_ob_coord[-1][1], cld_ob_coord[-1][2])
+                C_local = compute_localization_array(ens_obj, param, cld_ob_coord[0], cld_ob_coord[1], cld_ob_coord[2])
                 if param['DA']['verbose'] > 0: print(f"  Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
             else:
                 C_local = None
@@ -274,9 +288,24 @@ def run_enkf(ens_obj, ob_df, param):
 
             if param['DA']['verbose'] > 0: print(f"  Time to assimilate {s} {j} = {(dt.datetime.now() - start_loop).total_seconds()} s")
 
+    # Compute O-A and save diagnostics to DataFrame
+    cld_hofxa = run_cld_forward_operator(ens_obj, ob_df, hofx_kw=param['DA']['hofx_kw'], 
+                                         verbose=param['DA']['verbose'], Nens=0)
+    for k in range(ens_obj.meta['Nens']):
+        cld_hofxa[k].compute_OmB()
+    for i, s in enumerate(cld_hofx[0].data['SID']):
+        if param['obs']['entire_file']:
+            ob_idx = list(range(len(cld_hofx[0].data['HOCB'][i])))
+        else:
+            ob_idx = param['obs']['ob_sel'][s]
+        for j in ob_idx:
+            for k in range(ens_obj.meta['Nens']):
+                diag[f"oma{k+1}"].append(cld_hofxa[k].data['OmB'][i][j])
+    diag_df = pd.DataFrame(diag)
+
     if param['DA']['verbose'] > 0: print(f"run_enkf total time = {(dt.datetime.now() - start_enkf).total_seconds()} s")
 
-    return ens_obj
+    return ens_obj, diag_df
 
 
 def save_ens(ens_obj, param):
@@ -296,8 +325,8 @@ def save_ens(ens_obj, param):
 
     """
 
-    in_fnames = [param['ens']['in_path'].format(num=n) for n in range(1, param['nmem'] + 1)]
-    out_fnames = [param['ens']['out_path'].format(num=n) for n in range(1, param['nmem'] + 1)]
+    in_fnames = [param['ens']['in_path'].format(num=n) for n in range(1, param['ens']['nmem'] + 1)]
+    out_fnames = [param['ens']['out_path'].format(num=n) for n in range(1, param['ens']['nmem'] + 1)]
 
     ens_obj.write_mpas_out_for_DA(in_fnames, out_fnames)
 
@@ -319,11 +348,13 @@ if __name__ == '__main__':
 
     # Run EnKF
     print('\nRunning EnKF')
-    ens_obj = run_enkf(ens_obj, cld_ob_df, param)
+    ens_obj, diag_df = run_enkf(ens_obj, cld_ob_df, param)
 
     # Save output
     print('\nWriting output to netCDF file')
     save_ens(ens_obj, param)
+    print('Writing DA diagnostic output')
+    diag_df.to_csv(param['DA']['diag_file'])
     
     print(f'\ntotal elapsed time = {(dt.datetime.now() - start).total_seconds()} s')
 

@@ -150,14 +150,14 @@ def read_parse_mpas(fnames,
     """
 
     # Read in mesh info
-    if verbose > 0: print('Reading MPAS mesh information')
+    if verbose > 0: print('  Reading MPAS mesh information')
     fix_ds = xr.open_dataset(fix_fname)
     loc = {'lat': np.rad2deg(fix_ds['latCell'].values),
            'lon': np.rad2deg(fix_ds['lonCell'].values) - 360,
            'hgt': (0.5*(fix_ds['zgrid'][:, 1:] + fix_ds['zgrid'][:, :-1]) - fix_ds['ter']).values}
 
     # Read in ensemble data
-    if verbose > 0: print('Reading MPAS mesh atmospheric information')
+    if verbose > 0: print('  Reading MPAS mesh atmospheric information')
     N3d = loc['hgt'].size
     Nens = len(fnames)
     state = np.zeros((N3d * len(state_fields), Nens))
@@ -208,7 +208,7 @@ def read_parse_upp(fnames,
     """
 
     # Read in grid info
-    if verbose > 0: print('Reading UPP grid information')
+    if verbose > 0: print('  Reading UPP grid information')
     fix_ds = xr.open_dataset(fnames[0], engine='pynio')
     shape_3d = fix_ds['HGT_P0_L105_GLC0'].shape
     loc = {'lat': np.ravel(fix_ds['gridlat_0'].values),
@@ -218,7 +218,7 @@ def read_parse_upp(fnames,
                              newshape=(shape_3d[1] * shape_3d[2], shape_3d[0]))}
 
     # Read in ensemble data
-    if verbose > 0: print('Reading UPP atmospheric information')
+    if verbose > 0: print('  Reading UPP atmospheric information')
     N3d = loc['hgt'].size
     Nens = len(fnames)
     state = np.zeros((N3d * len(state_fields), Nens))
