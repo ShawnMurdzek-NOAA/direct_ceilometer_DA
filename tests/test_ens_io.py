@@ -76,7 +76,7 @@ class TestEnsMPASIO():
 
     def test_write_mpas_out_for_DA(self, sample):
         """
-        Test the .write_mpas_out_for_DA() method using MPAS netCDF output
+        Test the .write_mpas_out_for_DA() method using MPAS netCDF output, with output set to 0
         """
         sample = copy.deepcopy(sample)
         in_fnames = [f'./sample_data/mpas/mem00{n}/mpasout.2024-05-27_04.00.00.TEST.nc' for n in range(1, 4)]
@@ -91,8 +91,29 @@ class TestEnsMPASIO():
             assert os.path.isfile(f)
 
         # Check output from a sample file
-        ds = xr.open_dataset(out_fnames[0])
-        assert np.all(np.isclose(ds['theta'].values, 0))
+        ds_out = xr.open_dataset(out_fnames[0])
+        assert np.all(np.isclose(ds_out['theta'].values, 0))
+        
+        # Clean up
+        for f in out_fnames:
+            os.remove(f)
+
+
+    def test_write_mpas_out_for_DA_no_change(self, sample):
+        """
+        Test the .write_mpas_out_for_DA() method using MPAS netCDF output, but don't alter data
+        """
+        sample = copy.deepcopy(sample)
+        in_fnames = [f'./sample_data/mpas/mem00{n}/mpasout.2024-05-27_04.00.00.TEST.nc' for n in range(1, 4)]
+        out_fnames = [f'./sample_data/mpas/mem00{n}/mpasout.DA.2024-05-27_04.00.00.TEST.nc' for n in range(1, 4)]
+
+        # Call method
+        sample.write_mpas_out_for_DA(in_fnames, out_fnames)
+
+        # Check output from a sample file
+        ds_in = xr.open_dataset(in_fnames[0])
+        ds_out = xr.open_dataset(out_fnames[0])
+        assert np.all(np.isclose(ds_in['cldfrac'].values, ds_out['cldfrac'].values))
         
         # Clean up
         for f in out_fnames:

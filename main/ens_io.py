@@ -1,6 +1,8 @@
 """
 Functions for Cloud DA Ensemble I/O
 
+All necessary unit conversions for ensemble data are also handled here
+
 shawn.s.murdzek@noaa.gov
 """
 
@@ -115,7 +117,9 @@ class ens_data():
             ds = xr.open_dataset(in_f)
             model_dict = self.var_dict(i)
             for v in self.varnames:
-                ds[v].values = np.expand_dims(model_dict[v], axis=0)
+                data = model_dict[v]
+                if v == 'cldfrac': data = data * 0.01
+                ds[v].values = np.expand_dims(data, axis=0)
             ds.to_netcdf(out_f)
     
 
