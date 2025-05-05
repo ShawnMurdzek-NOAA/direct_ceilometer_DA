@@ -197,9 +197,13 @@ class sfc_cld_forward_operator():
 
         model_KDTree = ss.KDTree(np.array([self.model_dict['x_proj'], self.model_dict['y_proj']]).T)
         _, idx1d = model_KDTree.query(np.array([self.data['x_proj'], self.data['y_proj']]).T)
-        for idx in idx1d:
-            for f in fields:
-                self.data[f'model_col_{f}'].append(self.model_dict[f][idx, :])
+        for f in fields:
+            if len(self.model_dict[f].shape) == 1:
+                for idx in idx1d:
+                    self.data[f'model_col_{f}'].append(self.model_dict[f][idx])
+            else:
+                for idx in idx1d:
+                    self.data[f'model_col_{f}'].append(self.model_dict[f][idx, :])
     
 
     def impose_hgt_limits(self, min_hgt=10, max_hgt=3658, hgt_field='model_col_hgt',
@@ -582,7 +586,7 @@ def ceilometer_hofx_driver(cld_ob_df, model_dict, debug=0, verbose=1, cld_field=
     cld_hofx = sfc_cld_forward_operator(cld_ob_df, model_dict, cld_field=cld_field, debug=debug)
 
     if verbose > 0: print('Interpolating model columns to obs locations...')
-    cld_hofx.interp_model_col_to_ob(fields=[cld_field, 'hgt'], **interp_col_kw)
+    cld_hofx.interp_model_col_to_ob(fields=[cld_field, 'hgt', 'lat', 'lon'], **interp_col_kw)
 
     if verbose > 0: print('Imposing height limits and min cld fraction...')
     cld_hofx.impose_hgt_limits(hgt_field='model_col_hgt',

@@ -18,7 +18,7 @@ import numpy as np
 
 class ens_data():
     """
-    Class to handle ensemble output for cloud DA
+    Class to handle ensemble output for cloud DA. Note that cloud fraction must be in %, not decimal.
 
     Parameters
     ----------
@@ -29,7 +29,7 @@ class ens_data():
     loc : dictionary
         Location of forecast variables. Must include:
             lat : Latitude in deg N. Dimensions: (N2d)
-            lon : Longitude in deg E. Dimensions: (N2d)
+            lon : Longitude in deg E and in range (-180, 180). Dimensions: (N2d)
             hgt : Height AGL (m). Dimensions: (N2d, Nz)
         Note: N2d * Nz * Nvars = Nx
     other : dictionary, optional
@@ -168,7 +168,11 @@ def read_parse_mpas(fnames,
         ds = xr.open_dataset(f)
         idx = 0
         for v in state_fields:
-            state[idx:(idx+N3d), i] = np.ravel(ds[v].values)
+            if v == 'cldfrac':
+                data = ds[v].values * 100
+            else:
+                data = ds[v].values
+            state[idx:(idx+N3d), i] = np.ravel(data)
             idx = idx + N3d
         for key in other_fields.keys():
             other[other_fields[key]].append(np.ravel(ds[key].values))

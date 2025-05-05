@@ -67,9 +67,11 @@ class TestEnsMPASIO():
         model_dict = sample.var_dict(0)
 
         # Check that atmospheric fields match
-        for f_origin, f_new in zip(['theta', 'qv', 'cldfrac', 'qc'],
-                                   ['theta', 'qv', 'cldfrac', 'cld_mass_mix']):
-            assert np.all(np.isclose(ds[f_origin].values, model_dict[f_new]))
+        # Account for fact that ens_io uses % for cloud fraction, whereas raw MPAS output uses decimal
+        for f_origin, f_new, scale in zip(['theta', 'qv', 'cldfrac', 'qc'],
+                                          ['theta', 'qv', 'cldfrac', 'cld_mass_mix'],
+                                          [1, 1, 100, 1]):
+            assert np.all(np.isclose(ds[f_origin].values * scale, model_dict[f_new]))
     
 
     def test_write_mpas_out_for_DA(self, sample):

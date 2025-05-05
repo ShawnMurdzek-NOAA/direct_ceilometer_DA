@@ -17,27 +17,11 @@ obs:
   domain: []
   entire_file: False
   ob_sel:
-    KACY: [0, 1]
+    TEST1: [0, 1]
     KBID: [0]
     KEWR: [0, 1]
-    KFBG: [0, 1]
     KFMH: [0, 1]
-    KFQD: [0, 1]
-    KFRG: [0, 1]
-    KGEV: [0, 1]
-    KGYY: [0, 1]
-    KHLX: [0]
-    KHOP: [0, 1]
-    KIPJ: [0]
-    KJEF: [0, 1]
-    KJXI: [0, 1]
-    KMWK: [0, 1]
-    KOXB: [0, 1]
     KOXC: [0, 1]
-    KSNC: [0]
-    KUNV: [0, 1]
-    KVIH: [0, 1]
-    KWWD: [0, 1]
   lim_DHR: True
   verbose: 1
 
