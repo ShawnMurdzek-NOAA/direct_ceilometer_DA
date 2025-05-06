@@ -76,7 +76,7 @@ The basic framework for this program comes from [Whitaker and Hamill 2002](https
 
 ## Contact
 
-Shawn Murdzek
-Cooperative Institute for Research in Environmental Sciences (CIRES) at University of Colorado Boulder
-Embedded in NOAA/OAR/Global Systems Laboratory
+Shawn Murdzek  
+Cooperative Institute for Research in Environmental Sciences (CIRES) at University of Colorado Boulder  
+Embedded in NOAA/OAR/Global Systems Laboratory  
 shawn.s.murdzek@noaa.gov
