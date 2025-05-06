@@ -73,3 +73,10 @@ The `misc/plot_bufr_cloud_obs` program can be used to plot ceilometer observatio
 ## Algorithm Overview
 
 The basic framework for this program comes from [Whitaker and Hamill 2002](https://journals.ametsoc.org/view/journals/mwre/130/7/1520-0493_2002_130_1913_edawpo_2.0.co_2.xml), which provides an overview of the EnSRF. Given that cloud fraction may not be a prognostic variable in the atmospheric model being used, using an EnSRF is beneficial because it allows us to update other variables related to cloud fraction that are prognostic (e.g., temperature and humidity) without needing to explicitly specify the relationships between these variables. This is done through the background error covariances derived from the ensemble in the EnSRF. In order to compare the atmospheric model to the ceilometer observations, the forward operator essentially interpolates model cloud fraction to ceilometer cloud cover observations.
+
+## Contact
+
+Shawn Murdzek
+Cooperative Institute for Research in Environmental Sciences (CIRES) at University of Colorado Boulder
+Embedded in NOAA/OAR/Global Systems Laboratory
+shawn.s.murdzek@noaa.gov
