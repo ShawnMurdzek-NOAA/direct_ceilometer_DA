@@ -47,6 +47,7 @@ dependencies:
   - exceptiongroup=1.2.2=pyhd8ed1ab_1
   - executing=2.1.0=pyhd8ed1ab_1
   - expat=2.6.4=h5888daf_0
+  - flake8=7.2.0=pyhd8ed1ab_0
   - flexcache=0.3=pyhd8ed1ab_1
   - flexparser=0.4=pyhd8ed1ab_1
   - font-ttf-dejavu-sans-mono=2.37=hab24e00_0
@@ -157,6 +158,7 @@ dependencies:
   - markupsafe=3.0.2=py39h9399b63_1
   - matplotlib-base=3.9.4=py39h16632d1_0
   - matplotlib-inline=0.1.7=pyhd8ed1ab_1
+  - mccabe=0.7.0=pyhd8ed1ab_1
   - mda-xdrlib=0.2.0=pyhd8ed1ab_1
   - metpy=1.6.3=pyhd8ed1ab_1
   - msgpack-python=1.1.0=py39h74842e3_0
@@ -194,7 +196,9 @@ dependencies:
   - pthread-stubs=0.4=hb9d3cd8_1002
   - ptyprocess=0.7.0=pyhd8ed1ab_1
   - pure_eval=0.2.3=pyhd8ed1ab_1
+  - pycodestyle=2.13.0=pyhd8ed1ab_0
   - pycparser=2.22=pyh29332c3_1
+  - pyflakes=3.3.2=pyhd8ed1ab_0
   - pygments=2.19.1=pyhd8ed1ab_0
   - pynio=1.5.5=py39h086e2a9_22
   - pyparsing=3.2.1=pyhd8ed1ab_0
