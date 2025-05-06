@@ -25,7 +25,7 @@ obs:
   lim_DHR: True
   verbose: 1
 
-# DA settings
+# DA Settings
 DA:
   perform_da: True
   state_vars: ['theta', 'qv', 'cldfrac']

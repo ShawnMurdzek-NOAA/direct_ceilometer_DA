@@ -1,7 +1,7 @@
 # Input Parameters for BUFR CSV Cloud Ob Plotting Code
 #-----------------------------------------------------
 
-# Stations to include. Set plot_all: True to plot all stations
+# Station IDs to include. Set plot_all: True to plot all stations
 plot_all: False
 plot_sid:
   - TEST1
@@ -10,7 +10,9 @@ plot_sid:
   - KFMH
   - KOXC
 
-# General plotting parameters
+# General plotting parameters.
+# 'plot_tag' is appended to each output PNG
+# Longitudes are in deg E and latitudes are in deg N
 plot_tag: 'test'
 min_lon: -125 
 max_lon: -65
@@ -18,12 +20,14 @@ min_lat: 32
 max_lat: 52
 
 # Specific plotting parameters for cloud ceilings
+# vmin and vmax are in m AGL
 ceil:
   vmin: 0
   vmax: 85
   cmap: 'plasma'
 
 # Specific plotting parameters for cloud amount binned by height
+# Bins are in m AGL
 cld_amt:
   figsize: [8, 10]
   nrows: 3
