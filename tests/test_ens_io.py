@@ -102,6 +102,9 @@ class TestEnsMPASIO():
     def test_write_mpas_out_for_DA_no_change(self, sample):
         """
         Test the .write_mpas_out_for_DA() method using MPAS netCDF output, but don't alter data
+
+        Test may fail if unit conversions for cldfrac are not handled properly 
+        (MPAS output uses decimals, but cloud DA code uses %)
         """
         sample = copy.deepcopy(sample)
         in_fnames = [f'./sample_data/mpas/mem00{n}/mpasout.2024-05-27_04.00.00.TEST.nc' for n in range(1, 4)]

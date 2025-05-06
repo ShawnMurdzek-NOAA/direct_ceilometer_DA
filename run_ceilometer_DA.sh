@@ -9,7 +9,7 @@
 #SBATCH --ntasks-per-node=1
 
 code_path=/ncrc/home2/Shawn.S.Murdzek/src/direct_ceilometer_DA
-yml_fname=S_NewEngland_2022020121_EnKF_input.yml
+yml_fname=sample.yml
 
 date
 
