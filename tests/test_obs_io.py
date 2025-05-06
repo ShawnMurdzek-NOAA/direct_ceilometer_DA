@@ -8,11 +8,17 @@ shawn.s.murdzek@noaa.gov
 # Import Modules
 #---------------------------------------------------------------------------------------------------
 
+# Add top-level directory to PYTHONPATH
+import sys
+import os
+path = '/'.join(os.getcwd().split('/')[:-1])
+sys.path.append(path)
+
 import pytest
 import xarray as xr
 import numpy as np
 
-from direct_ceilometer_DA.main import obs_io
+from main import obs_io
 
 
 #---------------------------------------------------------------------------------------------------

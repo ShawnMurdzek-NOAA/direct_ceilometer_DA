@@ -39,8 +39,10 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
+        # First need to update the pyDA_utils submodule, otherwise we won't be able to find anything in this module
+        git submodule update --init --recursive
         source activate cloud_da_env
-        export PYTHONPATH=$PYTHONPATH:/home/runner/work:/home/runner/work/direct_ceilometer_DA
+        export PYTHONPATH=$PYTHONPATH:/home/runner/work/direct_ceilometer_DA/
         echo $PYTHONPATH
         cd ./tests
         pytest --ignore=./sample_data --ignore=./sample.yml
