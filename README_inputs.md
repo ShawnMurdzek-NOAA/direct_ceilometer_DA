@@ -1,74 +1,37 @@
 # Input YAML File Description
 
-The inputs for `ceilometer_obs_enkf.py` come from a single YAML file. Examples of these YAML files can be found in the `tests/` directory. This README includes descriptions of the various fields in these input YAML files.
+The inputs for `ceilometer_obs_enkf.py` come from a single YAML file. An example YAML file can be found in `tests/sample.yml`. This README includes descriptions of the various fields in an input YAML file.
 
-## Input data sources
+## Ensemble Information
+- **in_path**: Template for the ensemble background files. Must include a {num} placeholder for the ensemble member number.
+- **out_path**: Template for the ensemble analysis files produced by the program. Must include a {num} placeholder for the ensemble member number.
+- **fix_file**: File containing the cell latitude and longitude information (only needed when using MPAS netCDF files).
+- **type**: Ensemble file type. Only fully functioning option at the moment is 'mpas'.
+- **nmem**: Number of ensemble members.
+- **verbose**: Verbosity level for ensemble I/O. Larger numbers result in more output being printed as the program runs.
 
-- **str_format**: Ensemble member output files. Must include a {num} placeholder for the ensemble member number and a {lev} placeholder for the level type (prslev or natlev).
-- **prslev_vars**: Pressure-level variables to include. Naming convention follows that used in Xarray when using pyNIO as the engine.
-- **nmem**: Number of ensemble members
-- **save_to_nc**: Option to save ensemble member output to a netCDF file for easier and quicker I/O in the future. If set to True, the program will check to see if the netCDF file specified in **save_ens_nc** exists. If it does exist, ensemble member output is read in from that netCDF file rather than the files specified using **str_format**. If the netCDF file does not exist, then **str_format** is used and ensemble member output is saved to **subset_ens_nc**.
-- **subset_ens_nc**: NetCDF file where ensemble member output is saved to.
-- **bufr_fname**: BUFR CSV file containing the observations used for DA.
+## Observation Information
+- **fname**: File containing ceilometer observations.
+- **domain**: Only retain observations within the specified spatial domain. Must specify 4 values: [minlat, minlon, maxlat, maxlon]. Latitudes are in deg N and longitudes are in deg E.
+- **entire_file**: Option to assimilate all ceilometer observations within the observation file.
+- **ob_sel**: Specific station IDs to assimilate. Must set `entire_file: False` to use this option. Consists of a dictionary where the key is the station ID and the value is the list of vertical indices to assimilate.
+- **lim_DHR**: Option to only keep observations from a single time (i.e., the DHR value closest to 0) if there are observations from multiple times from a single ceilometer.
+- **verbose**: Verbosity level for observation I/O. Larger numbers result in more output being printed as the program runs.
 
-## Subset domain
-
-Rather than running the DA algorithm over the entire domain, the program instead subsets the data to a subdomain first to reduce computational cost. This domain is configured using the following:
-
-- **min_lon**: Minimum longitude (deg E).
-- **max_lon**: Maximum longitude (deg E).
-- **min_lat**: Minimum latitude (deg N).
-- **max_lat**: Maximum latitude (deg N).
-- **z_ind**: Model native vertical levels to include.
-
-## DA options
-
-- **state_vars**: Variable to include in the state vector. It is assumed that these variables are 3D. Naming convention follows that used in Xarray when using pyNIO as the engine.
-- **perform_da**: Option to perform DA. Setting to False only plots the background fields. If only plotting the background fields, it is also helpful to set **plot_stat_config/plot_bgd_once** to True.
-- **do_bec**: Option to compute the full background error covariance matrix (deprecated, do not use).
-- **ob_sel**: Observations used for DA. Includes multiple levels:
-  - Experiment name. To use all observations in **bufr_fname**, this level should be "<experiment name>: entire file", with <experiment name> replaced with the appropriate experiment name
-    - Station IDs (e.g., KHFD)
-      - Observation indices to use (starting from 0).
-- **ob_var**: Observation error variance for the cloud cover observations (units: %^2).
-- **redo_hofx**: Option to recompute the forward operator after each observation is assimilated.
-- **hofx_kw**: Keyword arguments passed to `main.cloud_DA_forward_operator.ceilometer_hofx_driver`
-- **localization**: Localization options.
-  - **use**: Option to use localization. Set to True to use localization, False if localization is not desired.
-  - **lh**: Horizontal localization (km).
-  - **lv**: Vertical localization (model vertical levels).
-
-## Plotting options
-
-- **save_tag**: String added to all output file names.
-- **out_dir**: Directory to save output to.
-- **obs_plots**: Options for plotting observations.
-  - **ceil**: Options used for plotting observed cloud ceilings. Consists of keyword arguments passed directly to matplotlib.pyplot.scatter.
-- **postage_stamp_plots**: Options for postage stamp plots (i.e., each ensemble member plotted in a separate panel). Plots are 2D horizontal cross sections plotted at the vertical level closest to the average height of all assimilated observations. Includes multiple levels:
-  - Variable name (Naming convention follows that used in Xarray when using pyNIO as the engine).
-    - **title**: Plot title.
-    - **save_tag**: String added to the output file name.
-    - **cntf_kw**: Keyword arguments passed to matplotlib.pyplot.contourf.
-    - **ob_plot**: Options for plotting observation locations.
-      - **use**: Boolean controlling whether observation locations are included.
-      - **kw**: Keyword arguments passed to matplotlib.pyplot.plot.
-- **plot_postage_config**: Configuration options used for all postage stamp plots.
-  - **nrows**: Number of rows.
-  - **ncols**: Number of columns.
-  - **figsize**: Figure size.
-  - **skewt**: Option to plot skew-T, logp diagrams.
-  - **lapse_rate**: Option to plot vertical profiles of lapse rates.
-  - **z_max**: maximum height used for the skew-T, logp and lapse rate plots (m).
-  - **pseudo_ceil_RH_thres**: Relative humidity threshold used for diagnosing pseudo cloud ceilings.
-- **ens_stats_plots**: Options for plotting ensemble statistic plots. At the moment, all of these plots are 2D horizontal cross sections. Includes multiple levels:
-  - Variable name (Naming convention follows that used in Xarray when using pyNIO as the engine).
-    - **cntf_kw**: Keyword arguments passed to matplotlib.pyplot.contourf.
-    - **ob_plot**: Options for plotting observation locations.
-      - **use**: Boolean controlling whether observation locations are included.
-      - **kw**: Keyword arguments passed to matplotlib.pyplot.plot.
-- **plot_stat_config**: Configuration options used for all ensemble statistic plots.
-  - **plot_bgd_once**: Option to plot the background only once.
-  - **nrows**: Number of rows.
-  - **ncols**: Number of columns.
-  - **figsize**: Figure size.
-  - **klvls**: Vertical levels to include.
+## DA Settings
+- **perform_da**: Option to actually run the EnSRF. If set to false, O-B values are computed, but no DA is performed.
+- **state_vars**: Fields from the ensemble background files to include in the state vector used for DA.
+- **ob_var**: Observation error variance (in %^2).
+- **hofx_kw**: Various keywords passed to the forward operator (`main.cloud_DA_forward_operator.ceilometer_hofx_driver()`). Additional options and defaults values can be found in `main/cloud_DA_forward_operator.py`.
+  - **hgt_lim_kw**: Keyword arguments passed to `main.cloud_DA_forward_operator.sfc_cld_forward_operator.impose_hgt_limits()`
+    - **max_hgt**: Only assimilate cloud fraction observations below this height (m AGL)
+  - **clr_ob_kw**: Keyword arguments passed to `main.cloud_DA_forward_operator.sfc_cld_forward_operator.add_clear_obs()`
+    - **clr_ob_locs**: Vertical locations for clear observations (m AGL). Necessary because ceilometers only report where there are clouds.
+  - **cld_field**: Name of the cloud fraction field from the ensemble background files.
+  - **verbose**: Verbosity level for the forward operator. Larger numbers result in more output being printed as the program runs.
+- **localization**: Keyword arguments used for localization
+  - **use**: Option to use localization.
+  - **lh**: Horizontal localization length (km)
+  - **lv**: Vertical localization length (vertical model levels)
+- **verbose**: Verbosity level for running the EnSRF. Larger numbers result in more output being printed as the program runs.
+- **diag_file**: File to write DA diagnostic output to.

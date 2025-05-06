@@ -36,5 +36,11 @@ modules/
 # Output text files
 *.txt
 
+# Output from test case
+EnKF_diag.csv
+tests/sample_data/mpas/mem001/mpasout.DA.2024-05-27_04.00.00.TEST.nc
+tests/sample_data/mpas/mem002/mpasout.DA.2024-05-27_04.00.00.TEST.nc
+tests/sample_data/mpas/mem003/mpasout.DA.2024-05-27_04.00.00.TEST.nc
+
 # pycache
 __pycache__/

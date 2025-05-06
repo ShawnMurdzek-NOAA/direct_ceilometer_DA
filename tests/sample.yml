@@ -1,0 +1,45 @@
+# Input Parameters for Cloud DA Case Analysis
+#--------------------------------------------
+
+# Ensemble Information
+# 'in_path' and 'out_path' should include a {num} placeholder for ensemble member number
+ens:
+  in_path: './tests/sample_data/mpas/mem{num:03d}/mpasout.2024-05-27_04.00.00.TEST.nc'
+  out_path: './tests/sample_data/mpas/mem{num:03d}/mpasout.DA.2024-05-27_04.00.00.TEST.nc'
+  fix_file: './tests/sample_data/mpas/invariant_TEST.nc'
+  type: 'mpas'
+  nmem: 3
+  verbose: 1
+
+# Observation Information
+obs:
+  fname: './tests/sample_data/bufr/2024052704.rap.t04z.prepbufr.csv'
+  domain: []
+  entire_file: False
+  ob_sel:
+    TEST1: [0, 1]
+    KBID: [0]
+    KEWR: [0, 1]
+    KFMH: [0, 1]
+    KOXC: [0, 1]
+  lim_DHR: True
+  verbose: 1
+
+# DA Settings
+DA:
+  perform_da: True
+  state_vars: ['theta', 'qv', 'cldfrac']
+  ob_var: 156.25
+  hofx_kw:
+    hgt_lim_kw:
+      max_hgt: 85
+    clr_ob_kw:
+      clr_ob_locs: [35, 70]
+    cld_field: 'cldfrac'
+    verbose: 0
+  localization:
+    use: True
+    lh: 50
+    lv: 1
+  verbose: 3
+  diag_file: 'EnKF_diag.csv'
