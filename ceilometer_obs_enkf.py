@@ -239,7 +239,7 @@ def run_enkf(ens_obj, ob_df, param):
 
     # Loop over each observation
     for i, s in enumerate(cld_hofx[0].data['SID']):
-        if param['obs']['entire_file']:
+        if (param['obs']['entire_file']) or (len(param['obs']['ob_sel'][s]) == 0):
             ob_idx = list(range(len(cld_hofx[0].data['HOCB'][i])))
         else:
             ob_idx = param['obs']['ob_sel'][s]
@@ -294,7 +294,7 @@ def run_enkf(ens_obj, ob_df, param):
     for k in range(ens_obj.meta['Nens']):
         cld_hofxa[k].compute_OmB()
     for i, s in enumerate(cld_hofx[0].data['SID']):
-        if param['obs']['entire_file']:
+        if (param['obs']['entire_file']) or (len(param['obs']['ob_sel'][s]) == 0):
             ob_idx = list(range(len(cld_hofx[0].data['HOCB'][i])))
         else:
             ob_idx = param['obs']['ob_sel'][s]

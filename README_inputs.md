@@ -13,8 +13,8 @@ The inputs for `ceilometer_obs_enkf.py` come from a single YAML file. An example
 ## Observation Information
 - **fname**: File containing ceilometer observations.
 - **domain**: Only retain observations within the specified spatial domain. Must specify 4 values: [minlat, minlon, maxlat, maxlon]. Latitudes are in deg N and longitudes are in deg E.
-- **entire_file**: Option to assimilate all ceilometer observations within the observation file.
-- **ob_sel**: Specific station IDs to assimilate. Must set `entire_file: False` to use this option. Consists of a dictionary where the key is the station ID and the value is the list of vertical indices to assimilate.
+- **entire_file**: Option to assimilate all ceilometer observations from all stations within the observation file.
+- **ob_sel**: Specific station IDs to assimilate. Must set `entire_file: False` to use this option. Consists of a dictionary where the key is the station ID and the value is a list containing the vertical indices (starting at 0) of the observations from that station to assimilate after running the forward operator (so clear observations are included). To assimilate all observations from a single station, set the value to an empty list.
 - **lim_DHR**: Option to only keep observations from a single time (i.e., the DHR value closest to 0) if there are observations from multiple times from a single ceilometer.
 - **verbose**: Verbosity level for observation I/O. Larger numbers result in more output being printed as the program runs.
 

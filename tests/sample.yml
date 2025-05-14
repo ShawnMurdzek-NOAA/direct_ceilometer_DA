@@ -18,8 +18,8 @@ obs:
   entire_file: False
   ob_sel:
     TEST1: [0, 1]
-    KBID: [0]
-    KEWR: [0, 1]
+    KBID: []
+    KEWR: []
     KFMH: [0, 1]
     KOXC: [0, 1]
   lim_DHR: True
