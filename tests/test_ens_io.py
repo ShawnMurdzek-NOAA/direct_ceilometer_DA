@@ -104,6 +104,37 @@ class TestEnsMPASIO():
             os.remove(f)
 
 
+    def test_write_mpas_out_for_DA_append(self, sample):
+        """
+        Test the .write_mpas_out_for_DA() method using MPAS netCDF output, with output set to 0
+
+        This test appends to the original file rather than creating a new file
+        """
+        sample = copy.deepcopy(sample)
+        in_fnames = [f'./sample_data/mpas/mem00{n}/mpasout.2024-05-27_04.00.00.TEST.nc' for n in range(1, 4)]
+        out_fnames = [f'./sample_data/mpas/mem00{n}/mpasout.DA.2024-05-27_04.00.00.TEST.nc' for n in range(1, 4)]
+
+        # Copy in_fnames to out_fnames so we don't overwrite our test data
+        for in_f, out_f in zip(in_fnames, out_fnames):
+            os.system(f"cp {in_f} {out_f}")
+
+        # Check to make sure output files exist
+        for f in out_fnames:
+            assert os.path.isfile(f)
+
+        # Make some changes to data, then call method
+        sample.state = np.zeros(sample.state.shape)
+        sample.write_mpas_out_for_DA(out_fnames, out_fnames)
+
+        # Check output from a sample file
+        ds_out = xr.open_dataset(out_fnames[0])
+        assert np.all(np.isclose(ds_out['theta'].values, 0))
+        
+        # Clean up
+        for f in out_fnames:
+            os.remove(f)
+
+
     def test_write_mpas_out_for_DA_no_change(self, sample):
         """
         Test the .write_mpas_out_for_DA() method using MPAS netCDF output, but don't alter data

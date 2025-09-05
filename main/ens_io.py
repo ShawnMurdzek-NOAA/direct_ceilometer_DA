@@ -114,13 +114,19 @@ class ens_data():
         """
 
         for i, (in_f, out_f) in enumerate(zip(in_fnames, out_fnames)):
-            ds = xr.open_dataset(in_f)
+            if (in_f == out_f):
+                ds = xr.open_dataset(in_f, mode='a')
+            else:
+                ds = xr.open_dataset(in_f)
             model_dict = self.var_dict(i)
             for v in self.varnames:
                 data = model_dict[v]
                 if v == 'cldfrac': data = data * 0.01
                 ds[v].values = np.expand_dims(data, axis=0)
-            ds.to_netcdf(out_f)
+            if (in_f == out_f):
+                ds.to_netcdf(out_f, mode='a')
+            else:
+                ds.to_netcdf(out_f)
     
 
 def read_parse_mpas(fnames, 
