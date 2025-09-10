@@ -183,19 +183,30 @@ def compute_localization_array(ens_obj, param, z, lon, lat):
     local_fct = local.localization_fct(local.gaspari_cohn_5ord)
 
     # Extract information needed to compute localization
-    # Note that localization in the vertical uses the model vertical level (not height)
     Nz = ens_obj.meta['Nz']
     N2d = ens_obj.meta['N2d']
     Nvar = ens_obj.meta['Nvars']
-    model_pts = np.array([list(np.ravel(np.repeat(np.arange(Nz)[np.newaxis, :], N2d, axis=0))) * Nvar, 
-                          list(np.ravel(np.repeat(ens_obj.loc['lat'][:, np.newaxis], Nz, axis=1))) * Nvar, 
-                          list(np.ravel(np.repeat(ens_obj.loc['lon'][:, np.newaxis], Nz, axis=1))) * Nvar]).T
-    ob_pt = np.array([z, lat, lon])
     lh = param['DA']['localization']['lh']
     lv = param['DA']['localization']['lv']
 
-    # Compute localization
-    C = local_fct.compute_localization(model_pts, ob_pt, lv, lh)
+    # Compute localization in horizontal and vertical dimensions separately, then combine
+    # Note that localization in the vertical uses the model vertical level (not height)
+    model_latlon_pts = np.array([ens_obj.loc['lat'], ens_obj.loc['lon']]).T
+    model_z_pts = np.arange(Nz)
+    Ch = local_fct.compute_partial_localization(model_latlon_pts, [lat, lon], lh)
+    Cv = local_fct.compute_partial_localization(model_z_pts, z, lv)
+    C_3d_1var = np.repeat(Cv[np.newaxis, :], N2d, axis=0) * np.repeat(Ch[:, np.newaxis], Nz, axis=1)
+    C = np.array(list(np.ravel(C_3d_1var)) * Nvar)
+
+    # Old approach - Much slower, especially for larger domains
+    # Current approach and old approach do not perfectly agree, but for the test case, max diffs
+    # tend to be O(1e-5), which I think are acceptable
+    #model_pts = np.array([list(np.ravel(np.repeat(np.arange(Nz)[np.newaxis, :], N2d, axis=0))) * Nvar, 
+    #                      list(np.ravel(np.repeat(ens_obj.loc['lat'][:, np.newaxis], Nz, axis=1))) * Nvar, 
+    #                      list(np.ravel(np.repeat(ens_obj.loc['lon'][:, np.newaxis], Nz, axis=1))) * Nvar]).T
+    #ob_pt = np.array([z, lat, lon])
+    #C_old = local_fct.compute_localization(model_pts, ob_pt, lv, lh)
+    #print(np.amax(np.abs(C - C_old)))
 
     return C
 
