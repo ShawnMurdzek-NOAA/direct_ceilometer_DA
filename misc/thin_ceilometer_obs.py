@@ -81,7 +81,7 @@ def parse_in_args(argv):
     parser.add_argument('--minlon',
                         dest='minlon',
                         default=-120,
-                        help='Minimum longitude for (lat, lon) box (deg E)',
+                        help='Minimum longitude for (lat, lon) box (deg E, 0 to 360)',
                         type=float)
 
     parser.add_argument('--maxlat',
@@ -93,7 +93,7 @@ def parse_in_args(argv):
     parser.add_argument('--maxlon',
                         dest='maxlon',
                         default=-60,
-                        help='Maximum longitude for (lat, lon) box (deg E)',
+                        help='Maximum longitude for (lat, lon) box (deg E, 0 to 360)',
                         type=float)
 
     return parser.parse_args(argv)
@@ -129,27 +129,29 @@ if __name__ == '__main__':
     bufr_csv = bufr.bufrCSV(param.in_csv)
     print(f"Initial number of obs = {len(bufr_csv.df)}")
 
-    # Only keep obs closest to DHR = 0
-    if param.limDHR:
-        bufr_csv.select_dhr(0)
+    # Remove non-ADPSFC obs
+    if param.only_sfc:
+        bufr_csv.df = bufr_csv.df.loc[bufr_csv.df['subset'] == 'ADPSFC', :]
+        print(f"Number of obs after removing non-ADPSFC obs = {len(bufr_csv.df)}")
 
     # Only keep obs within a desired (lat, lon) box
     if param.apply_box:
         bufr_csv.select_latlon(param.minlat, param.minlon, param.maxlat, param.maxlon)
-
-    # Remove non-ADPSFC obs
-    if param.only_sfc:
-        bufr_csv.df = bufr_csv.df.loc[bufr_csv.df['subset'] == 'ADPSFC', :]
-
-    ob_df = bufr_csv.df
-    print(f"Number of obs after optional filters (limDHR, llbox, ADPSFC) = {len(ob_df)}")
+        print(f"Number of obs after applying (lat, lon) box = {len(bufr_csv.df)}")
 
     # Remove non-ceilometer obs
-    ob_df = remove_non_ceilometer_obs(ob_df)
-    print(f"Number of obs after removing non-ceilometer obs = {len(ob_df)}")
+    bufr_csv.df = remove_non_ceilometer_obs(bufr_csv.df)
+    print(f"Number of obs after removing non-ceilometer obs = {len(bufr_csv.df)}")
+
+    # Only keep obs closest to DHR = 0
+    # This step can be rather slow, so it's best to do it later after most of the obs have
+    # already been filtered out
+    if param.limDHR:
+        bufr_csv.select_dhr(0)
+        print(f"Number of obs after limDHR filter = {len(bufr_csv.df)}")
 
     # Thin obs
-    thin_df = bufr.thin_obs_2d(ob_df, radius=param.min_radius, retain_all_sid=True)
+    thin_df = bufr.thin_obs_2d(bufr_csv.df, radius=param.min_radius, retain_all_sid=True)
     print(f"Number of obs after thinning = {len(thin_df)}")
     print(f"Number of unique sites = {len(thin_df['SID'].unique())}")
 
