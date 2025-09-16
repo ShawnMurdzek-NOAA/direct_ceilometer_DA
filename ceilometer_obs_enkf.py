@@ -256,9 +256,12 @@ def run_enkf(ens_obj, ob_df, param):
             ob_idx = param['obs']['ob_sel'][s]
         for j in ob_idx:
             start_loop = dt.datetime.now()
-            if param['DA']['verbose'] > 1: print(f"  Looping over ob {s} {j}")
+            if param['DA']['verbose'] > 1: 
+                print(f"  -----------------------")
+                print(f"  Looping over ob {s} {j}")
 
             # Extract cloud amount, H(x), and location
+            start_extract = dt.datetime.now()
             hofx = np.zeros(ens_obj.meta['Nens'])
             cld_ob_coord = [0, cld_hofx[0].data['lon'][i], cld_hofx[0].data['lat'][i]]
             for k in range(ens_obj.meta['Nens']):
@@ -266,16 +269,19 @@ def run_enkf(ens_obj, ob_df, param):
                 cld_ob_coord[0] = cld_ob_coord[0] + cld_hofx[k].data['ob_hgt_model'][i][j]
             cld_ob_coord[0] = cld_ob_coord[0] / ens_obj.meta['Nens']
             cld_amt = cld_hofx[0].data['ob_cld_amt'][i][j]
+            if param['DA']['verbose'] > 2: print(f"  Time to extract cld amt, H(x), and location = {(dt.datetime.now() - start_extract).total_seconds()} s")
 
             if param['DA']['verbose'] > 2: print("  H(x) =", hofx)
 
             # Save diagnostic output
+            start_save = dt.datetime.now()
             diag['hgt'].append(cld_hofx[0].data['HOCB'][i][j])    # Height in m rather than height in model vertical levels
             diag['lon'].append(cld_ob_coord[1])
             diag['lat'].append(cld_ob_coord[2])
             diag['ob'].append(cld_amt)
             for k in range(ens_obj.meta['Nens']):
                 diag[f"omb{k+1}"].append(cld_amt - hofx[k])
+            if param['DA']['verbose'] > 2: print(f"  Time to save initial diag output = {(dt.datetime.now() - start_save).total_seconds()} s")
 
             # Skip remaining steps if not performing DA
             if not param['DA']['perform_da']:
@@ -286,13 +292,15 @@ def run_enkf(ens_obj, ob_df, param):
                 start_local = dt.datetime.now()
                 if param['DA']['verbose'] > 2: print(f"  computing localization with lh = {param['DA']['localization']['lh']}, lv = {param['DA']['localization']['lv']}")
                 C_local = compute_localization_array(ens_obj, param, cld_ob_coord[0], cld_ob_coord[1], cld_ob_coord[2])
-                if param['DA']['verbose'] > 0: print(f"  Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
+                if param['DA']['verbose'] > 1: print(f"  Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
             else:
                 C_local = None
 
             # Run EnKF
+            start_ensrf = dt.datetime.now()
             enkf_obj = enkf.enkf_1ob(ens_obj.state, cld_amt, hofx, param['DA']['ob_var'], localize=C_local)
             enkf_obj.EnSRF()
+            if param['DA']['verbose'] > 1: print(f"  Time to complete EnSRF = {(dt.datetime.now() - start_ensrf).total_seconds()} s")
 
             # Update ens_obj with the new analysis
             ens_obj.state = enkf_obj.x_a
