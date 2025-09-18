@@ -285,7 +285,7 @@ def run_enkf(ens_obj, ob_df, param):
             if param['DA']['verbose'] > 2: print(f"  Time to save initial diag output = {(dt.datetime.now() - start_save).total_seconds()} s")
 
             # Skip remaining steps if not performing DA or if all O-B values are 0
-            if (not param['DA']['perform_da']) or (np.isclose(np.sum(np.abs(omb)), 0)):
+            if (not param['DA']['perform_da']) or (np.isclose(np.sum(np.abs(omb)), 0) and param['DA']['skip_zero_omb']):
                 if param['DA']['verbose'] > 1: print("  Skipping DA step")
                 continue
             

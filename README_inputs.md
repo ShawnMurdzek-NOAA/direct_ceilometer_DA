@@ -20,6 +20,7 @@ The inputs for `ceilometer_obs_enkf.py` come from a single YAML file. An example
 
 ## DA Settings
 - **perform_da**: Option to actually run the EnSRF. If set to false, O-B values are computed, but no DA is performed.
+- **skip_zero_omb**: Option to skip assimilating observations where all O-B values are 0. These observations will have no impact on the analysis, so it is more efficient to skip them. This should almost always be set to True.
 - **state_vars**: Fields from the ensemble background files to include in the state vector used for DA.
 - **ob_var**: Observation error variance (in %^2).
 - **hofx_kw**: Various keywords passed to the forward operator (`main.cloud_DA_forward_operator.ceilometer_hofx_driver()`). Additional options and defaults values can be found in `main/cloud_DA_forward_operator.py`.
