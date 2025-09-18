@@ -279,12 +279,14 @@ def run_enkf(ens_obj, ob_df, param):
             diag['lon'].append(cld_ob_coord[1])
             diag['lat'].append(cld_ob_coord[2])
             diag['ob'].append(cld_amt)
+            omb = np.array([cld_amt - h for h in hofx])
             for k in range(ens_obj.meta['Nens']):
-                diag[f"omb{k+1}"].append(cld_amt - hofx[k])
+                diag[f"omb{k+1}"].append(omb[k])
             if param['DA']['verbose'] > 2: print(f"  Time to save initial diag output = {(dt.datetime.now() - start_save).total_seconds()} s")
 
-            # Skip remaining steps if not performing DA
-            if not param['DA']['perform_da']:
+            # Skip remaining steps if not performing DA or if all O-B values are 0
+            if (not param['DA']['perform_da']) or (np.isclose(np.sum(np.abs(omb)), 0)):
+                if param['DA']['verbose'] > 1: print("  Skipping DA step")
                 continue
             
             # Compute localization
