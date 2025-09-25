@@ -30,9 +30,9 @@ The inputs for `ceilometer_obs_enkf.py` come from a single YAML file. An example
     - **clr_ob_locs**: Vertical locations for clear observations (m AGL). Necessary because ceilometers only report where there are clouds.
   - **cld_field**: Name of the cloud fraction field from the ensemble background files.
   - **verbose**: Verbosity level for the forward operator. Larger numbers result in more output being printed as the program runs.
-- **localization**: Keyword arguments used for localization
+- **localization**: Keyword arguments used for localization. The fifth-order function from Gaspari and Cohn (1999, QJRMS), their eqn (4.10), is used for localization.
   - **use**: Option to use localization.
-  - **lh**: Horizontal localization length (km)
-  - **lv**: Vertical localization length (vertical model levels)
+  - **lh**: Horizontal localization half length (km). The localization function goes to 0 at 2lh.
+  - **lv**: Vertical localization half length (vertical model levels). The localization function goes to 0 at 2lv.
 - **verbose**: Verbosity level for running the EnSRF. Larger numbers result in more output being printed as the program runs.
 - **diag_file**: File to write DA diagnostic output to.
