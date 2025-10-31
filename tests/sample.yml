@@ -44,3 +44,4 @@ DA:
     lv: 1
   verbose: 3
   diag_file: 'EnKF_diag.csv'
+  update_hofx_with_enkf: True

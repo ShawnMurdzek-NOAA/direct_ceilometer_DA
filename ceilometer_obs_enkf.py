@@ -138,26 +138,59 @@ def run_cld_forward_operator(ens_obj, cld_ob_df, hofx_kw={}, verbose=0, Nens=0):
     
     Returns
     -------
-    cld_hofx : dictionary of cfo.sfc_cld_forward_operator objects
-        Ceilometer forward operator output for each ensemble member
+    cld_hofx : dictionary
+        Series of fields corresponding to H(x) output, including...
+            hofx : H(x) value. Dimensions: (Nobs, Nens)
+            ob : Observed value. Dimensions: (Nobs)
+            loc : Observation location. Dimensions: (Nobs, 3)
+            SID : Station IDs. Dimensions: (Nobs)
+            HOCB : Observation heights in m. Dimensions: (Nobs)
 
     """
     
-    cld_hofx = []
+    cld_hofx_ls = []
 
     # Run forward operator
     if Nens == 0: Nens = ens_obj.meta['Nens']
     for n in range(Nens):
         if verbose > 0: print(f'Running forward operator on ensemble member {n+1}')
         model_dict = ens_obj.var_dict(n)
-        cld_hofx.append(cfo.ceilometer_hofx_driver(cld_ob_df, model_dict, **hofx_kw))
-    
+        cld_hofx_ls.append(cfo.ceilometer_hofx_driver(cld_ob_df, model_dict, **hofx_kw))
+   
+    # Reformat output
+    Nobs = 0
+    Nsid = len(cld_hofx_ls[0].data['SID'])
+    for i in range(Nsid):
+        Nobs = Nobs + len(cld_hofx_ls[0].data['HOCB'][i])
+
+    cld_hofx = {'hofx': np.zeros([Nobs, Nens]),
+                'ob': np.zeros([Nobs]),
+                'loc': np.zeros([Nobs, 3]),
+                'SID': [],
+                'HOCB': np.zeros([Nobs])}
+
+    n = 0
+    for i in range(Nsid):
+        nz = len(cld_hofx_ls[0].data['HOCB'][i])
+        cld_hofx['ob'][n:(n+nz)] = cld_hofx_ls[0].data['ob_cld_amt'][i]
+        cld_hofx['loc'][n:(n+nz), 1] = cld_hofx_ls[0].data['lat'][i]
+        cld_hofx['loc'][n:(n+nz), 2] = cld_hofx_ls[0].data['lon'][i]
+        cld_hofx['SID'] = cld_hofx['SID'] + [cld_hofx_ls[0].data['SID'][i]] * nz
+        cld_hofx['HOCB'][n:(n+nz)] = cld_hofx_ls[0].data['HOCB'][i]
+        for j in range(Nens):
+            cld_hofx['loc'][n:(n+nz), 0] = cld_hofx['loc'][n:(n+nz), 0] + cld_hofx_ls[j].data['ob_hgt_model'][i]
+            cld_hofx['hofx'][n:(n+nz), j] = cld_hofx_ls[j].data['hofx'][i]
+        n = n + nz
+
+    cld_hofx['SID'] = np.array(cld_hofx['SID'])
+    cld_hofx['loc'][:, 0] = cld_hofx['loc'][:, 0] / Nens
+
     return cld_hofx
 
 
-def compute_localization_array(ens_obj, param, z, lon, lat):
+def compute_localization_model(ens_obj, param, z, lat, lon):
     """
-    Compute localization array for EnKF DA
+    Compute localization array for the model gridpoints
 
     Parameters
     ----------
@@ -167,10 +200,10 @@ def compute_localization_array(ens_obj, param, z, lon, lat):
         YAML inputs
     z : float
         Observation height
-    lon : float
-        Observation longitude (deg E)
     lat : float
         Observation latitude (deg N)
+    lon : float
+        Observation longitude (deg E)
     
     Returns
     -------
@@ -211,6 +244,43 @@ def compute_localization_array(ens_obj, param, z, lon, lat):
     return C
 
 
+def compute_localization_hofx(hofx_pts, param, z, lat, lon):
+    """
+    Compute localization array for H(x)
+
+    Parameters
+    ----------
+    hofx_pts : array
+        Coordinates of H(x) values in (z, lat, lon). Dimensions: (npts, 3)
+    param : dictionary
+        YAML inputs
+    z : float
+        Observation height
+    lat : float
+        Observation latitude (deg N)
+    lon : float
+        Observation longitude (deg E)
+
+    Returns
+    -------
+    C : np.ndarray
+        Localization array
+
+    """
+
+    # Use Gaspari and Cohn (1999) 5th-order localization fct
+    local_fct = local.localization_fct(local.gaspari_cohn_5ord)
+
+    # Extract information needed to compute localization
+    lh = param['DA']['localization']['lh']
+    lv = param['DA']['localization']['lv']
+
+    ob_pt = np.array([z, lat, lon])
+    C = local_fct.compute_localization(hofx_pts, ob_pt, lv, lh)
+
+    return C
+
+
 def run_enkf(ens_obj, ob_df, param):
     """
     Run EnKF for an arbitrary number of observations
@@ -235,93 +305,89 @@ def run_enkf(ens_obj, ob_df, param):
 
     start_enkf = dt.datetime.now()
 
-    # Initialize dictionary for diagnostic output
-    diag = {}
-    for f in ['hgt', 'lon', 'lat', 'ob']:
-        diag[f] = []
-    for f in ['omb', 'oma']:
-        for k in range(ens_obj.meta['Nens']):
-            diag[f"{f}{k+1}"] = []
-
     # Apply cloud DA forward operator
     cld_hofx = run_cld_forward_operator(ens_obj, ob_df, hofx_kw=param['DA']['hofx_kw'], 
                                         verbose=param['DA']['verbose'], Nens=0)
     if param['DA']['verbose'] > 0: print(f"Time to complete forward operator for all members and obs = {(dt.datetime.now() - start_enkf).total_seconds()} s")
 
+    # Save some diagnostics
+    Nobs, Nens = cld_hofx['hofx'].shape
+    diag = {}
+    diag['hgt'] = cld_hofx['HOCB']
+    diag['lat'] = cld_hofx['loc'][:, 1]
+    diag['lon'] = cld_hofx['loc'][:, 2]
+    diag['ob'] = cld_hofx['ob']
+    diag['use'] = np.ones(Nobs)
+    for k in range(Nens):
+        diag[f"omb{k+1}"] = cld_hofx['ob'] - cld_hofx['hofx'][:, k]
+
     # Loop over each observation
-    for i, s in enumerate(cld_hofx[0].data['SID']):
-        if (param['obs']['entire_file']) or (len(param['obs']['ob_sel'][s]) == 0):
-            ob_idx = list(range(len(cld_hofx[0].data['HOCB'][i])))
-        else:
-            ob_idx = param['obs']['ob_sel'][s]
-        for j in ob_idx:
-            start_loop = dt.datetime.now()
-            if param['DA']['verbose'] > 1: 
-                print(f"  -----------------------")
-                print(f"  Looping over ob {s} {j}")
+    for i, s in enumerate(cld_hofx['SID']):
 
-            # Extract cloud amount, H(x), and location
-            start_extract = dt.datetime.now()
-            hofx = np.zeros(ens_obj.meta['Nens'])
-            cld_ob_coord = [0, cld_hofx[0].data['lon'][i], cld_hofx[0].data['lat'][i]]
-            for k in range(ens_obj.meta['Nens']):
-                hofx[k] = cld_hofx[k].data['hofx'][i][j]
-                cld_ob_coord[0] = cld_ob_coord[0] + cld_hofx[k].data['ob_hgt_model'][i][j]
-            cld_ob_coord[0] = cld_ob_coord[0] / ens_obj.meta['Nens']
-            cld_amt = cld_hofx[0].data['ob_cld_amt'][i][j]
-            if param['DA']['verbose'] > 2: print(f"  Time to extract cld amt, H(x), and location = {(dt.datetime.now() - start_extract).total_seconds()} s")
+        start_loop = dt.datetime.now()
 
-            if param['DA']['verbose'] > 2: print("  H(x) =", hofx)
-
-            # Save diagnostic output
-            start_save = dt.datetime.now()
-            diag['hgt'].append(cld_hofx[0].data['HOCB'][i][j])    # Height in m rather than height in model vertical levels
-            diag['lon'].append(cld_ob_coord[1])
-            diag['lat'].append(cld_ob_coord[2])
-            diag['ob'].append(cld_amt)
-            omb = np.array([cld_amt - h for h in hofx])
-            for k in range(ens_obj.meta['Nens']):
-                diag[f"omb{k+1}"].append(omb[k])
-            if param['DA']['verbose'] > 2: print(f"  Time to save initial diag output = {(dt.datetime.now() - start_save).total_seconds()} s")
-
-            # Skip remaining steps if not performing DA or if all O-B values are 0
-            if (not param['DA']['perform_da']) or (np.isclose(np.sum(np.abs(omb)), 0) and param['DA']['skip_zero_omb']):
-                if param['DA']['verbose'] > 1: print("  Skipping DA step")
+        # Option to only assimilate certain obs from a particular SID
+        if (not param['obs']['entire_file']) and (len(param['obs']['ob_sel'][s]) > 0):
+            all_sid_idx = np.where(cld_hofx['SID'] == s)[0]
+            this_sid_idx = np.where(all_sid_idx == i)[0][0]
+            if this_sid_idx not in param['obs']['ob_sel'][s]:
+                diag['use'][i] = 0
                 continue
+
+        if param['DA']['verbose'] > 1: 
+            print(f"  -----------------------")
+            print(f"  Station = {s}, Ob = {i} (of {Nobs})")
+
+        # Extract cloud amount, H(x), and location
+        start_extract = dt.datetime.now()
+        hofx = cld_hofx['hofx'][i, :]
+        cld_ob_coord = cld_hofx['loc'][i, :]
+        cld_amt = cld_hofx['ob'][i]
+        if param['DA']['verbose'] > 2: print(f"  Time to extract cld amt, H(x), and location = {(dt.datetime.now() - start_extract).total_seconds()} s")
+        if param['DA']['verbose'] > 2: print("  ob loc =", cld_ob_coord)
+        if param['DA']['verbose'] > 2: print("  ob =", cld_amt)
+        if param['DA']['verbose'] > 2: print("  H(x) =", hofx)
+
+        # Skip remaining steps if not performing DA or if all O-B values are 0
+        omb = cld_amt - hofx
+        if (not param['DA']['perform_da']) or (np.isclose(np.sum(np.abs(omb)), 0) and param['DA']['skip_zero_omb']):
+            if param['DA']['verbose'] > 1: print("  Skipping DA step")
+            diag['use'][i] = 0
+            continue
             
-            # Compute localization
-            if param['DA']['localization']['use']:
-                start_local = dt.datetime.now()
-                if param['DA']['verbose'] > 2: print(f"  computing localization with lh = {param['DA']['localization']['lh']}, lv = {param['DA']['localization']['lv']}")
-                C_local = compute_localization_array(ens_obj, param, cld_ob_coord[0], cld_ob_coord[1], cld_ob_coord[2])
-                if param['DA']['verbose'] > 1: print(f"  Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
-            else:
-                C_local = None
+        # Compute localization
+        if param['DA']['localization']['use']:
+            start_local = dt.datetime.now()
+            if param['DA']['verbose'] > 2: print(f"  computing localization with lh = {param['DA']['localization']['lh']}, lv = {param['DA']['localization']['lv']}")
+            C_local = compute_localization_model(ens_obj, param, cld_ob_coord[0], cld_ob_coord[1], cld_ob_coord[2])
+            if param['DA']['update_hofx_with_enkf']:
+                C_hofx = compute_localization_hofx(cld_hofx['loc'], param, cld_ob_coord[0], cld_ob_coord[1], cld_ob_coord[2])
+            if param['DA']['verbose'] > 1: print(f"  Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
+        else:
+            C_local = None
+            C_hofx = None
 
-            # Run EnKF
-            start_ensrf = dt.datetime.now()
-            enkf_obj = enkf.enkf_1ob(ens_obj.state, cld_amt, hofx, param['DA']['ob_var'], localize=C_local)
-            enkf_obj.EnSRF()
-            if param['DA']['verbose'] > 1: print(f"  Time to complete EnSRF = {(dt.datetime.now() - start_ensrf).total_seconds()} s")
+        # Run EnKF
+        start_ensrf = dt.datetime.now()
+        enkf_obj = enkf.enkf_1ob(ens_obj.state, cld_amt, hofx, param['DA']['ob_var'], localize=C_local)
+        enkf_obj.EnSRF()
+        if param['DA']['update_hofx_with_enkf']:
+            enkf_obj_hofx = enkf.enkf_1ob(cld_hofx['hofx'], cld_amt, hofx, param['DA']['ob_var'], localize=C_hofx)
+            enkf_obj_hofx.EnSRF()
+        if param['DA']['verbose'] > 1: print(f"  Time to complete EnSRF = {(dt.datetime.now() - start_ensrf).total_seconds()} s")
 
-            # Update ens_obj with the new analysis
-            ens_obj.state = enkf_obj.x_a
+        # Update ens_obj with the new analysis
+        ens_obj.state = enkf_obj.x_a
+        if param['DA']['update_hofx_with_enkf']:
+            cld_hofx['hofx'] = enkf_obj_hofx.x_a
 
-            if param['DA']['verbose'] > 0: print(f"  Time to assimilate {s} {j} = {(dt.datetime.now() - start_loop).total_seconds()} s")
+        if param['DA']['verbose'] > 0: print(f"  Time to assimilate {i} = {(dt.datetime.now() - start_loop).total_seconds()} s")
 
     # Compute O-A and save diagnostics to DataFrame
     cld_hofxa = run_cld_forward_operator(ens_obj, ob_df, hofx_kw=param['DA']['hofx_kw'], 
                                          verbose=param['DA']['verbose'], Nens=0)
     for k in range(ens_obj.meta['Nens']):
-        cld_hofxa[k].compute_OmB()
-    for i, s in enumerate(cld_hofx[0].data['SID']):
-        if (param['obs']['entire_file']) or (len(param['obs']['ob_sel'][s]) == 0):
-            ob_idx = list(range(len(cld_hofx[0].data['HOCB'][i])))
-        else:
-            ob_idx = param['obs']['ob_sel'][s]
-        for j in ob_idx:
-            for k in range(ens_obj.meta['Nens']):
-                diag[f"oma{k+1}"].append(cld_hofxa[k].data['OmB'][i][j])
+        diag[f"oma{k+1}"] = cld_hofxa['ob'] - cld_hofxa['hofx'][:, k] 
     diag_df = pd.DataFrame(diag)
 
     if param['DA']['verbose'] > 0: print(f"run_enkf total time = {(dt.datetime.now() - start_enkf).total_seconds()} s")
