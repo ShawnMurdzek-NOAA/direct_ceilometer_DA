@@ -173,8 +173,8 @@ def run_cld_forward_operator(ens_obj, cld_ob_df, hofx_kw={}, verbose=0, Nens=0):
     for i in range(Nsid):
         nz = len(cld_hofx_ls[0].data['HOCB'][i])
         cld_hofx['ob'][n:(n+nz)] = cld_hofx_ls[0].data['ob_cld_amt'][i]
-        cld_hofx['loc'][n:(n+nz), 1] = cld_hofx_ls[0].data['lon'][i]
-        cld_hofx['loc'][n:(n+nz), 2] = cld_hofx_ls[0].data['lat'][i]
+        cld_hofx['loc'][n:(n+nz), 1] = cld_hofx_ls[0].data['lat'][i]
+        cld_hofx['loc'][n:(n+nz), 2] = cld_hofx_ls[0].data['lon'][i]
         cld_hofx['SID'] = cld_hofx['SID'] + [cld_hofx_ls[0].data['SID'][i]] * nz
         cld_hofx['HOCB'][n:(n+nz)] = cld_hofx_ls[0].data['HOCB'][i]
         for j in range(Nens):
@@ -188,7 +188,7 @@ def run_cld_forward_operator(ens_obj, cld_ob_df, hofx_kw={}, verbose=0, Nens=0):
     return cld_hofx
 
 
-def compute_localization_model(ens_obj, param, z, lon, lat):
+def compute_localization_model(ens_obj, param, z, lat, lon):
     """
     Compute localization array for the model gridpoints
 
@@ -200,10 +200,10 @@ def compute_localization_model(ens_obj, param, z, lon, lat):
         YAML inputs
     z : float
         Observation height
-    lon : float
-        Observation longitude (deg E)
     lat : float
         Observation latitude (deg N)
+    lon : float
+        Observation longitude (deg E)
     
     Returns
     -------
@@ -244,7 +244,7 @@ def compute_localization_model(ens_obj, param, z, lon, lat):
     return C
 
 
-def compute_localization_hofx(hofx_pts, param, z, lon, lat):
+def compute_localization_hofx(hofx_pts, param, z, lat, lon):
     """
     Compute localization array for H(x)
 
@@ -256,10 +256,10 @@ def compute_localization_hofx(hofx_pts, param, z, lon, lat):
         YAML inputs
     z : float
         Observation height
-    lon : float
-        Observation longitude (deg E)
     lat : float
         Observation latitude (deg N)
+    lon : float
+        Observation longitude (deg E)
 
     Returns
     -------
@@ -314,8 +314,8 @@ def run_enkf(ens_obj, ob_df, param):
     Nobs, Nens = cld_hofx['hofx'].shape
     diag = {}
     diag['hgt'] = cld_hofx['HOCB']
-    diag['lon'] = cld_hofx['loc'][:, 1]
-    diag['lat'] = cld_hofx['loc'][:, 2]
+    diag['lat'] = cld_hofx['loc'][:, 1]
+    diag['lon'] = cld_hofx['loc'][:, 2]
     diag['ob'] = cld_hofx['ob']
     diag['use'] = np.ones(Nobs)
     for k in range(Nens):
@@ -360,18 +360,26 @@ def run_enkf(ens_obj, ob_df, param):
             start_local = dt.datetime.now()
             if param['DA']['verbose'] > 2: print(f"  computing localization with lh = {param['DA']['localization']['lh']}, lv = {param['DA']['localization']['lv']}")
             C_local = compute_localization_model(ens_obj, param, cld_ob_coord[0], cld_ob_coord[1], cld_ob_coord[2])
+            if param['DA']['update_hofx_with_enkf']:
+                C_hofx = compute_localization_hofx(cld_hofx['loc'], param, cld_ob_coord[0], cld_ob_coord[1], cld_ob_coord[2])
             if param['DA']['verbose'] > 1: print(f"  Time to complete localization = {(dt.datetime.now() - start_local).total_seconds()} s")
         else:
             C_local = None
+            C_hofx = None
 
         # Run EnKF
         start_ensrf = dt.datetime.now()
         enkf_obj = enkf.enkf_1ob(ens_obj.state, cld_amt, hofx, param['DA']['ob_var'], localize=C_local)
         enkf_obj.EnSRF()
+        if param['DA']['update_hofx_with_enkf']:
+            enkf_obj_hofx = enkf.enkf_1ob(cld_hofx['hofx'], cld_amt, hofx, param['DA']['ob_var'], localize=C_hofx)
+            enkf_obj_hofx.EnSRF()
         if param['DA']['verbose'] > 1: print(f"  Time to complete EnSRF = {(dt.datetime.now() - start_ensrf).total_seconds()} s")
 
         # Update ens_obj with the new analysis
         ens_obj.state = enkf_obj.x_a
+        if param['DA']['update_hofx_with_enkf']:
+            cld_hofx['hofx'] = enkf_obj_hofx.x_a
 
         if param['DA']['verbose'] > 0: print(f"  Time to assimilate {i} = {(dt.datetime.now() - start_loop).total_seconds()} s")
 

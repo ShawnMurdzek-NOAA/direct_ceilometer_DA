@@ -36,3 +36,4 @@ The inputs for `ceilometer_obs_enkf.py` come from a single YAML file. An example
   - **lv**: Vertical localization half length (vertical model levels). The localization function goes to 0 at 2lv.
 - **verbose**: Verbosity level for running the EnSRF. Larger numbers result in more output being printed as the program runs.
 - **diag_file**: File to write DA diagnostic output to.
+- **update_hofx_with_enkf**: Option to update H(x) after each observation is assimilated using a separate EnKF call.
