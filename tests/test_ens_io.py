@@ -77,7 +77,7 @@ class TestEnsMPASIO():
                                           ['theta', 'qv', 'cldfrac', 'cld_mass_mix'],
                                           [1, 1, 100, 1]):
             assert np.all(np.isclose(ds[f_origin].values * scale, model_dict[f_new]))
-    
+
 
     def test_write_mpas_out_for_DA(self, sample):
         """
@@ -157,6 +157,41 @@ class TestEnsMPASIO():
         # Clean up
         for f in out_fnames:
             os.remove(f)
+
+
+    def test_read_parse_mpas_k_end(self, sample):
+        """
+        Test read_parse_mpas() when k_end is not None
+
+        Note: In its current form, the order of these tests matters. If this test is before the 
+        test_write_mpas* tests, those tests will fail!
+        """
+
+        sample = copy.deepcopy(sample)
+
+        # Read MPAS data with k_end != None
+        fnames = [f'./sample_data/mpas/mem00{n}/mpasout.2024-05-27_04.00.00.TEST.nc' for n in range(1, 4)]
+        state_fields = ['theta', 'qv', 'cldfrac']
+        other_fields = {'qc' : 'cld_mass_mix'}
+        fix_fname = './sample_data/mpas/invariant_TEST.nc'
+        ftype = 'mpas'
+        k_end = 2
+        subset_ens = ens_io.read_ens(fnames,
+                                     state_fields=state_fields,
+                                     other_fields=other_fields,
+                                     fix_fname=fix_fname,
+                                     ftype=ftype,
+                                     k_end=k_end)
+
+        # Check size of state
+        assert subset_ens.meta['Nz'] == k_end
+        assert subset_ens.meta['Nz'] < sample.meta['Nz']
+        assert subset_ens.meta['Nx'] < sample.meta['Nx']
+
+        # Check that the right subset was extracted
+        theta_subset = subset_ens.var_dict(0)['theta']
+        theta_full = sample.var_dict(0)['theta']
+        assert np.all(np.isclose(theta_subset, theta_full[:, :k_end]))
 
 
 class TestEnsUPPIO():

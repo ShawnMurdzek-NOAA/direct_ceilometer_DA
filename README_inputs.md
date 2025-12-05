@@ -8,6 +8,7 @@ The inputs for `ceilometer_obs_enkf.py` come from a single YAML file. An example
 - **fix_file**: File containing the cell latitude and longitude information (only needed when using MPAS netCDF files).
 - **type**: Ensemble file type. Only fully functioning option at the moment is 'mpas'.
 - **nmem**: Number of ensemble members.
+- **n_zlvl**: Number of vertical levels starting from the surface to read from the ensemble members (omit to read all vertical levels). E.g., to only use the 10 lowest model levels, set `n_zlvl: 10`.
 - **verbose**: Verbosity level for ensemble I/O. Larger numbers result in more output being printed as the program runs.
 
 ## Observation Information

@@ -10,6 +10,7 @@ ens:
   type: 'mpas'
   nmem: 3
   verbose: 1
+  n_zlvl: 3
 
 # Observation Information
 obs:
