@@ -68,8 +68,8 @@ def read_ensemble(param):
     if (param['ens']['type'] == 'upp'):
         print('\nWarning: UPP output has not been extensively tested yet\n')
 
-    if 'k_end' not in list(param['ens'].keys()):
-        param['ens']['k_end'] = None
+    if 'n_zlvl' not in list(param['ens'].keys()):
+        param['ens']['n_zlvl'] = None
 
     fnames = [param['ens']['in_path'].format(num=n) for n in range(1, param['ens']['nmem'] + 1)]
     ens_obj = ens_io.read_ens(fnames,
@@ -78,7 +78,7 @@ def read_ensemble(param):
                               verbose=param['ens']['verbose'],
                               fix_fname=param['ens']['fix_file'],
                               ftype=param['ens']['type'],
-                              k_end=param['ens']['k_end'])
+                              k_end=param['ens']['n_zlvl'])
 
     return ens_obj
 
