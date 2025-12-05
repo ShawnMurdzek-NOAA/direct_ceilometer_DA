@@ -63,7 +63,6 @@ class TestEnsMPASIO():
         Test the .var_dict() method using MPAS netCDF output
         """
         sample = copy.deepcopy(sample)
-        print(sample.meta)
 
         # Read in mesh info and netCDF output for a single member
         ds_info = xr.open_dataset('./sample_data/mpas/invariant_TEST.nc')
@@ -98,8 +97,6 @@ class TestEnsMPASIO():
 
         # Check output from a sample file
         ds_out = xr.open_dataset(out_fnames[0])
-        print(ds_out['theta'].shape)
-        print(ds_out['theta'][0, 0, :].values)
         assert np.all(np.isclose(ds_out['theta'].values, 0))
         
         # Clean up
@@ -188,10 +185,10 @@ class TestEnsMPASIOKend():
         k_end = 3
         assert sample.meta['Nz'] == k_end
 
-        #ds = xr.open_dataset('./sample_data/mpas/mem001/mpasout.2024-05-27_04.00.00.TEST.nc')
-        #print(sample.state.shape)
-        #subset_theta = sample.var_dict(0)['theta']
-        #assert np.all(np.isclose(subset_theta, ds['theta'][:, :k_end].values))
+        ds = xr.open_dataset('./sample_data/mpas/mem001/mpasout.2024-05-27_04.00.00.TEST.nc')
+        print(sample.state.shape)
+        subset_theta = sample.var_dict(0)['theta']
+        assert np.all(np.isclose(subset_theta, ds['theta'][:, :, :k_end].values))
 
 
 class TestEnsUPPIO():

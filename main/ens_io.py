@@ -80,6 +80,7 @@ class ens_data():
         N2d = self.meta['N2d']
         Nz = self.meta['Nz']
         N3d = N2d * Nz
+        print(f"N3d = {N3d}")
 
         # State variables
         for i, v in enumerate(self.varnames):
@@ -121,9 +122,10 @@ class ens_data():
                 ds = xr.open_dataset(in_f)
             model_dict = self.var_dict(i)
             for v in self.varnames:
-                data = model_dict[v]
+                data = np.expand_dims(model_dict[v], axis=0)
                 if v == 'cldfrac': data = data * 0.01
-                ds[v][:, :, :Nz].values = np.expand_dims(data, axis=0)
+                # Order here matters. Data is not written if indices are before .values
+                ds[v].values[:, :, :Nz] = data
             if (in_f == out_f):
                 ds.to_netcdf(out_f, mode='a')
             else:
@@ -196,8 +198,10 @@ def read_parse_mpas(fnames,
             state[idx:(idx+N3d), i] = np.ravel(data)
             idx = idx + N3d
         for key in other_fields.keys():
-            other[other_fields[key]].append(np.ravel(ds[key].values))
-    
+            other[other_fields[key]].append(np.ravel(ds[key][:, :, :k_end].values))
+   
+    ds.close()
+
     # Convert other output into arrays
     for key in other_fields.keys():
         name = other_fields[key]
