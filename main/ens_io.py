@@ -80,7 +80,6 @@ class ens_data():
         N2d = self.meta['N2d']
         Nz = self.meta['Nz']
         N3d = N2d * Nz
-        print(f"N3d = {N3d}")
 
         # State variables
         for i, v in enumerate(self.varnames):
@@ -182,7 +181,7 @@ def read_parse_mpas(fnames,
     N3d = loc['hgt'].size
     Nens = len(fnames)
     state = np.zeros((N3d * len(state_fields), Nens))
-    if verbose > 0: print(f"  MPAS mesh size = {N3d}")
+    if verbose > 0: print(f"  MPAS domain size = {N3d}")
     if verbose > 0: print('  Reading MPAS mesh atmospheric information')
     other = {}
     for key in other_fields.keys():
