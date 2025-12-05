@@ -63,6 +63,7 @@ class TestEnsMPASIO():
         Test the .var_dict() method using MPAS netCDF output
         """
         sample = copy.deepcopy(sample)
+        print(sample.meta)
 
         # Read in mesh info and netCDF output for a single member
         ds_info = xr.open_dataset('./sample_data/mpas/invariant_TEST.nc')
@@ -77,7 +78,7 @@ class TestEnsMPASIO():
                                           ['theta', 'qv', 'cldfrac', 'cld_mass_mix'],
                                           [1, 1, 100, 1]):
             assert np.all(np.isclose(ds[f_origin].values * scale, model_dict[f_new]))
-    
+
 
     def test_write_mpas_out_for_DA(self, sample):
         """
@@ -97,6 +98,8 @@ class TestEnsMPASIO():
 
         # Check output from a sample file
         ds_out = xr.open_dataset(out_fnames[0])
+        print(ds_out['theta'].shape)
+        print(ds_out['theta'][0, 0, :].values)
         assert np.all(np.isclose(ds_out['theta'].values, 0))
         
         # Clean up
@@ -157,6 +160,38 @@ class TestEnsMPASIO():
         # Clean up
         for f in out_fnames:
             os.remove(f)
+
+
+class TestEnsMPASIOKend():
+
+    @pytest.fixture(scope='class')
+    def sample(self):
+        fnames = [f'./sample_data/mpas/mem00{n}/mpasout.2024-05-27_04.00.00.TEST.nc' for n in range(1, 4)]
+        state_fields = ['theta', 'qv', 'cldfrac']
+        other_fields = {'qc' : 'cld_mass_mix'}
+        fix_fname = './sample_data/mpas/invariant_TEST.nc'
+        ftype = 'mpas'
+        k_end = 3
+        return ens_io.read_ens(fnames, 
+                           state_fields=state_fields,
+                           other_fields=other_fields,
+                           fix_fname=fix_fname,
+                           ftype=ftype,
+                           k_end=k_end)
+
+
+    def test_check_subset(self, sample):
+        """
+        Ensure that the ensemble is subset appropriately
+        """
+
+        k_end = 3
+        assert sample.meta['Nz'] == k_end
+
+        #ds = xr.open_dataset('./sample_data/mpas/mem001/mpasout.2024-05-27_04.00.00.TEST.nc')
+        #print(sample.state.shape)
+        #subset_theta = sample.var_dict(0)['theta']
+        #assert np.all(np.isclose(subset_theta, ds['theta'][:, :k_end].values))
 
 
 class TestEnsUPPIO():

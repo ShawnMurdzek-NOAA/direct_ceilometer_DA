@@ -10,7 +10,7 @@ ens:
   type: 'mpas'
   nmem: 3
   verbose: 1
-  k_end: 2
+  k_end: 3
 
 # Observation Information
 obs:

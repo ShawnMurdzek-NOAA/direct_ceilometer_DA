@@ -153,6 +153,8 @@ def read_parse_mpas(fnames,
         general name for the field
     k_end : integer or None, optional
         Max index in the vertical dimension (on mass grid). Set to None to not use.
+        Conventions follow Python indexing conventions (start at 0, with k_end not included).
+        I.e., Number of vertical levels to keep, starting at the surface
     verbose : int, optional
         Verbosity level
 
@@ -164,19 +166,22 @@ def read_parse_mpas(fnames,
     """
 
     # Read in mesh info
+    # Need the -1 if k_end = None b/c zgrid has a vertical dimension = nlvl in the mass grid + 1
+    # I.e., zgrid gives the height of the levels between the mass grid layers
     if verbose > 0: print('  Reading MPAS mesh information')
     fix_ds = xr.open_dataset(fix_fname)
     if k_end is None:
-        k_end = fix_ds['zgrid'].shape[1] - 2
+        k_end = fix_ds['zgrid'].shape[1] - 1
     loc = {'lat': np.rad2deg(fix_ds['latCell'].values),
            'lon': np.rad2deg(fix_ds['lonCell'].values) - 360,
-           'hgt': (0.5*(fix_ds['zgrid'][:, 1:(k_end+2)] + fix_ds['zgrid'][:, :(k_end+1)]) - fix_ds['ter']).values}
+           'hgt': (0.5*(fix_ds['zgrid'][:, 1:(k_end+1)] + fix_ds['zgrid'][:, :(k_end)]) - fix_ds['ter']).values}
 
     # Read in ensemble data
-    if verbose > 0: print('  Reading MPAS mesh atmospheric information')
     N3d = loc['hgt'].size
     Nens = len(fnames)
     state = np.zeros((N3d * len(state_fields), Nens))
+    if verbose > 0: print(f"  MPAS mesh size = {N3d}")
+    if verbose > 0: print('  Reading MPAS mesh atmospheric information')
     other = {}
     for key in other_fields.keys():
         other[other_fields[key]] = []
@@ -185,9 +190,9 @@ def read_parse_mpas(fnames,
         idx = 0
         for v in state_fields:
             if v == 'cldfrac':
-                data = ds[v][:, :, :(k_end+1)].values * 100
+                data = ds[v][:, :, :k_end].values * 100
             else:
-                data = ds[v][:, :, :(k_end+1)].values
+                data = ds[v][:, :, :k_end].values
             state[idx:(idx+N3d), i] = np.ravel(data)
             idx = idx + N3d
         for key in other_fields.keys():
