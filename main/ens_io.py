@@ -113,6 +113,7 @@ class ens_data():
 
         """
 
+        Nz = self.meta['Nz']
         for i, (in_f, out_f) in enumerate(zip(in_fnames, out_fnames)):
             if (in_f == out_f):
                 ds = xr.open_dataset(in_f, mode='a')
@@ -122,7 +123,7 @@ class ens_data():
             for v in self.varnames:
                 data = model_dict[v]
                 if v == 'cldfrac': data = data * 0.01
-                ds[v].values = np.expand_dims(data, axis=0)
+                ds[v][:, :, :Nz].values = np.expand_dims(data, axis=0)
             if (in_f == out_f):
                 ds.to_netcdf(out_f, mode='a')
             else:
@@ -133,6 +134,7 @@ def read_parse_mpas(fnames,
                     fix_fname, 
                     state_fields=['theta', 'qv', 'cldfrac'], 
                     other_fields={}, 
+                    k_end=None,
                     verbose=0):
     """
     Read and parse MPAS netCDF input
@@ -149,6 +151,8 @@ def read_parse_mpas(fnames,
     other_fields : dictionary, optional
         Other fields to extract (can have any dimensions). Key is MPAS field name, value is the 
         general name for the field
+    k_end : integer or None, optional
+        Max index in the vertical dimension (on mass grid). Set to None to not use.
     verbose : int, optional
         Verbosity level
 
@@ -162,9 +166,11 @@ def read_parse_mpas(fnames,
     # Read in mesh info
     if verbose > 0: print('  Reading MPAS mesh information')
     fix_ds = xr.open_dataset(fix_fname)
+    if k_end is None:
+        k_end = fix_ds['zgrid'].shape[1] - 2
     loc = {'lat': np.rad2deg(fix_ds['latCell'].values),
            'lon': np.rad2deg(fix_ds['lonCell'].values) - 360,
-           'hgt': (0.5*(fix_ds['zgrid'][:, 1:] + fix_ds['zgrid'][:, :-1]) - fix_ds['ter']).values}
+           'hgt': (0.5*(fix_ds['zgrid'][:, 1:(k_end+2)] + fix_ds['zgrid'][:, :(k_end+1)]) - fix_ds['ter']).values}
 
     # Read in ensemble data
     if verbose > 0: print('  Reading MPAS mesh atmospheric information')
@@ -179,9 +185,9 @@ def read_parse_mpas(fnames,
         idx = 0
         for v in state_fields:
             if v == 'cldfrac':
-                data = ds[v].values * 100
+                data = ds[v][:, :, :(k_end+1)].values * 100
             else:
-                data = ds[v].values
+                data = ds[v][:, :, :(k_end+1)].values
             state[idx:(idx+N3d), i] = np.ravel(data)
             idx = idx + N3d
         for key in other_fields.keys():
@@ -261,7 +267,8 @@ def read_ens(fnames,
              other_fields={}, 
              verbose=0, 
              fix_fname=None, 
-             ftype='mpas'):
+             ftype='mpas',
+             k_end=None):
     """
     Read ensemble output
 
@@ -280,6 +287,9 @@ def read_ens(fnames,
         File containing grid or mesh information. Only needed for MPAS output
     ftype : string, optional
         Input file type. Options: 'mpas' or 'upp'
+    k_end : integer or None, optional
+        Max index in the vertical dimension (on mass grid). Set to None to not use.
+        Only available for ftype = 'mpas'.
     
     Returns
     -------
@@ -293,8 +303,12 @@ def read_ens(fnames,
                                   fix_fname, 
                                   state_fields=state_fields, 
                                   other_fields=other_fields,
+                                  k_end=k_end,
                                   verbose=verbose)
     elif ftype == 'upp':
+        if k_end is not None:
+            raise ValueError("If ftype = 'upp', then k_end must be None")
+
         ens_obj = read_parse_upp(fnames,
                                  state_fields=state_fields, 
                                  other_fields=other_fields,
