@@ -123,8 +123,6 @@ class sfc_cld_forward_operator():
             Map projection string for pyproj
         fields : list of strings, optional
             Model fields to interpolate
-        zgrid : string
-            Name of model vertical grid
         
         Returns
         -------
