@@ -1,8 +1,32 @@
 # Input YAML File Description
 
-The inputs for `ceilometer_obs_enkf.py` come from a single YAML file. An example YAML file can be found in `tests/sample.yml`. This README includes descriptions of the various fields in an input YAML file.
+The inputs for `ceilometer_obs_enkf.py` come from a single YAML file. An example YAML file can be found here: `tests/sample.yml`. This README includes descriptions of all fields in an input YAML file.
 
-## Ensemble Information
+## *Conventions*
+Inputs are broken down by various sections (`ens`, `obs`, `DA`, etc.) which correspond to the outermost level of the YAML file. Within each section, inputs are given in a single table with nested inputs indicated with a `/`. As an example, consider the following YAML snippet:
+
+```
+DA:
+  ob_var: 156.25
+  hofx_kw:
+    hgt_lim_kw:
+      max_hgt: 85
+    clr_ob_kw:
+      clr_ob_locs: [35, 70]
+```
+
+In this case, the documentation for the `DA` section will be formatted as follows:
+
+| Parameter | Description | Default |
+| --------- | ----------- | ------- |
+| ob_var | A | $x_{1}$ |
+| hofx_kw | B | N/A |
+| hofx_kw/hgt_lim_kw | C | N/A | 
+| hofx_kw/hgt_lim_kw/max_hgt | D | $x_{2}$ |
+| hofx_kw/clr_ob_kw | E | N/A | 
+| hofx_kw/clr_ob_kw/clr_ob_locs | F | $x_{3}$ |
+
+## Ensemble Information (`ens`)
 - **in_path**: Template for the ensemble background files. Must include a {num} placeholder for the ensemble member number.
 - **out_path**: Template for the ensemble analysis files produced by the program. Must include a {num} placeholder for the ensemble member number.
 - **fix_file**: File containing the cell latitude and longitude information (only needed when using MPAS netCDF files).
@@ -11,7 +35,7 @@ The inputs for `ceilometer_obs_enkf.py` come from a single YAML file. An example
 - **n_zlvl**: Number of vertical levels starting from the surface to read from the ensemble members (omit to read all vertical levels). E.g., to only use the 10 lowest model levels, set `n_zlvl: 10`.
 - **verbose**: Verbosity level for ensemble I/O. Larger numbers result in more output being printed as the program runs.
 
-## Observation Information
+## Observation Information (`obs`)
 - **fname**: File containing ceilometer observations.
 - **domain**: Only retain observations within the specified spatial domain. Must specify 4 values: [minlat, minlon, maxlat, maxlon]. Latitudes are in deg N and longitudes are in deg E.
 - **entire_file**: Option to assimilate all ceilometer observations from all stations within the observation file.
@@ -19,7 +43,7 @@ The inputs for `ceilometer_obs_enkf.py` come from a single YAML file. An example
 - **lim_DHR**: Option to only keep observations from a single time (i.e., the DHR value closest to 0) if there are observations from multiple times from a single ceilometer.
 - **verbose**: Verbosity level for observation I/O. Larger numbers result in more output being printed as the program runs.
 
-## DA Settings
+## DA Settings (`DA`)
 - **perform_da**: Option to actually run the EnSRF. If set to false, O-B values are computed, but no DA is performed.
 - **skip_zero_omb**: Option to skip assimilating observations where all O-B values are 0. These observations will have no impact on the analysis, so it is more efficient to skip them. This should almost always be set to True.
 - **state_vars**: Fields from the ensemble background files to include in the state vector used for DA.
