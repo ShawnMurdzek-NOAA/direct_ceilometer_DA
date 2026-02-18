@@ -78,7 +78,6 @@ class sfc_cld_forward_operator():
     def decode_ob_clam(self):
         """
         Decode ceilometer cloud amount field (CLAM)
-        See the BUFR table here: https://www.emc.ncep.noaa.gov/mmb/data_processing/table_20.htm#0-20-011
 
         Parameters
         ----------
@@ -87,6 +86,15 @@ class sfc_cld_forward_operator():
         Returns
         -------
         None. Adds 'ob_cld_amt' and 'ob_cld_precision' fields to self.data
+
+        Notes
+        -----
+
+        ob_cld_precision is the half-width of the bin centered on ob_cld_amt
+        So if the bin has a width of 1/8 (12.5), then ob_cld_precision = 6.25
+
+        BUFR table: https://www.emc.ncep.noaa.gov/mmb/data_processing/table_20.htm#0-20-011
+        ASOS handbook (defines FEW, SCT, BKN in table 3): https://www.weather.gov/media/asos/aum-toc.pdf
 
         """
         self.data['ob_cld_amt'] = []
@@ -98,16 +106,16 @@ class sfc_cld_forward_operator():
             for j in range(nob):
                 if self.data['CLAM'][i][j] < 9:
                     self.data['ob_cld_amt'][i][j] = 100 * (self.data['CLAM'][i][j] / 8.)
-                    self.data['ob_cld_precision'][i][j] = 12.5
+                    self.data['ob_cld_precision'][i][j] = 6.25
                 elif np.isclose( self.data['CLAM'][i][j], 11):
                     self.data['ob_cld_amt'][i][j] = 37.5
-                    self.data['ob_cld_precision'][i][j] = 25.
+                    self.data['ob_cld_precision'][i][j] = 12.5
                 elif np.isclose( self.data['CLAM'][i][j], 12):
                     self.data['ob_cld_amt'][i][j] = 75.
-                    self.data['ob_cld_precision'][i][j] = 25
+                    self.data['ob_cld_precision'][i][j] = 25.
                 elif np.isclose( self.data['CLAM'][i][j], 13):
                     self.data['ob_cld_amt'][i][j] = 12.5
-                    self.data['ob_cld_precision'][i][j] = 25.
+                    self.data['ob_cld_precision'][i][j] = 12.5
 
 
     def interp_model_col_to_ob(self, method='nearest', proj_str='+proj=lcc +lat_0=39 +lon_0=-96 +lat_1=33 +lat_2=45',
@@ -123,8 +131,6 @@ class sfc_cld_forward_operator():
             Map projection string for pyproj
         fields : list of strings, optional
             Model fields to interpolate
-        zgrid : string
-            Name of model vertical grid
         
         Returns
         -------

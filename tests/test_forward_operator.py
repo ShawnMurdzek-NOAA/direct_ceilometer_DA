@@ -106,7 +106,7 @@ class TestForwardOperator():
         for i in hofx.data['idx']:
             for j in range(len(hofx.data['CLAM'][i])):
                 assert hofx.data['ob_cld_amt'][i][j] in [0, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100]
-                assert hofx.data['ob_cld_precision'][i][j] in [12.5, 25]
+                assert hofx.data['ob_cld_precision'][i][j] in [6.25, 12.5, 25]
 
 
     def test_interp_model_col_to_ob_nearest(self, sample):

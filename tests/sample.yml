@@ -10,7 +10,7 @@ ens:
   type: 'mpas'
   nmem: 3
   verbose: 1
-  n_zlvl: 3
+  n_zlvl: 4
 
 # Observation Information
 obs:
@@ -23,6 +23,7 @@ obs:
     KEWR: []
     KFMH: [0, 1]
     KOXC: [0, 1]
+    KBDL: []
   lim_DHR: True
   verbose: 1
 
